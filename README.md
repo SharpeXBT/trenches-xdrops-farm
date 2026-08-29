@@ -1,0 +1,132 @@
+# TRENCHES XDROPS FARM
+
+*Version française : [README_FR.md](README_FR.md)*
+
+
+Quotes a post-only bid and ask one tick apart on one OKX spot pair, lets others
+fill them, and sells back to flat. Spot cash only: it never borrows, never
+shorts, never spends more than the free balance it sees, and never takes
+liquidity while running. One file, standard library only.
+
+## What it costs
+
+You pay the maker fee on every dollar of volume plus roughly half a tick of
+price drift per round trip. At an 8bp maker fee that is about $8-10 per $10,000
+traded. At the default `TARGET_VOLUME_USD = 400000` expect roughly $320-400
+total. The bot hard-halts if realised loss exceeds
+`LOSS_CAP_MULT x` the priced budget (~$560 at defaults); the cap arms only
+after 4x `INVENTORY_BAND_USD` of volume has traded.
+
+## Requirements
+
+Python 3.9 or newer. Windows: double-click **`INSTALL_WINDOWS.bat`** - it
+checks Python and installs it if missing. Mac: run `bash install_mac.sh`.
+Nothing else - no pip installs.
+
+## Create an OKX API key
+
+- EEA (European) accounts: eea.okx.com -> Profile -> API keys.
+- All other accounts: www.okx.com, and change `HOST` at the bottom of bot.py to
+  `https://www.okx.com`. An EEA key does not work against www and vice versa.
+- Permissions: **Read + Trade only. Never enable Withdraw.**
+- Set an IP allowlist on the key (your own IP) if you can.
+
+## Configure
+
+Open bot.py, scroll to the bottom banner `1. YOUR SETTINGS`, and paste your
+three values into `API_KEY` / `API_SECRET` / `API_PASSPHRASE`. The keys never
+leave this file on your machine.
+
+Then set, in the same place:
+
+| Knob | Meaning |
+|---|---|
+| `SYMBOL` | spot pair, BASE-QUOTE, e.g. `RE-USDC` |
+| `TARGET_VOLUME_USD` | stop after this much volume (buy + sell legs both count) |
+| `CLIP_USD` | size of one quote; fund ~2x this in the quote currency to hold both sides |
+| `CLIP_USD_QUIET` | smaller clip used when the tape is quiet (the busy/quiet threshold self-measures from the symbol's 24h tape) |
+| `INVENTORY_BAND_USD` | hard ceiling on directional exposure; buying tapers to zero at it |
+| `LOSS_CAP_MULT` | the halt line: halts at `TAKER fee x this` per $10k; set it just under what your reward pays per $10k |
+
+Fund the account with at least 2x `CLIP_USD` of the quote currency plus
+`INVENTORY_BAND_USD` of headroom.
+
+## Run
+
+- Windows: double-click **`START_WINDOWS.bat`** (or `python bot.py` from a
+  terminal; Git Bash needs `winpty python bot.py`).
+- Mac: `python3 bot.py` from Terminal.
+
+It prints a summary of the target and expected cost and asks you to type
+`YES` before placing any order
+(skipped when input is not a terminal, so headless deploys don't hang).
+
+## The panel
+
+- `volume` - session volume done, $/min pace, and your share of the tape
+- `cost` - realised loss so far, $ per $10k traded, and the halt line
+- `fees / drift` - fee component vs price-drift component of the cost
+- `inv` - current inventory in $ against `INVENTORY_BAND_USD`
+- `book` - best bid/ask and the spread in ticks
+- `last` - the last action or error
+
+Events are also appended to `run.log`.
+
+## Stop safely
+
+Press Ctrl+C ONCE. The bot cancels its orders and sells back to flat
+(post-only) for up to `UNWIND_SECONDS`, then prints a final report including
+`base left` (anything it could not sell). Extra Ctrl+C presses are absorbed on
+purpose - do not mash keys at an apparently frozen screen. **Closing the
+terminal window instead kills the process instantly and its orders may be left
+resting** (the next start cancels them, but only if you restart).
+
+## When it stops by itself
+
+target reached | loss cap (after warmup) |
+10 consecutive exchange failures | no usable order book for 120s | account
+fees worse than `MAKER_BP_MAX` / `TAKER_BP_MAX` at startup.
+
+## Shared state & assumptions (read before running on a funded account)
+
+1. **The bot only trades what it buys itself.** At startup it snapshots your
+   existing base-coin balance as a baseline and never sells below it. Coins you
+   held before are yours; the bot manages only its own inventory on top.
+2. **One bot per account + symbol.** Starting it cancels ALL open regular
+   orders on the symbol (a clean slate; TP/SL, grid-bot and other algo orders
+   are not touched). Two instances on one account will cancel each other's
+   quotes. More generally: never point this bot at a base asset that any other
+   bot (grid, DCA) or your own manual trading also touches - their fills would
+   be mistaken for this bot's inventory. Other pairs on the same account are
+   fine; they only share the quote-currency wallet.
+3. **Fees:** built for VIP0/VIP1 (8bp maker / 10bp taker). It reads your real
+   tier at startup and refuses to run if yours is worse than MAKER_BP_MAX /
+   TAKER_BP_MAX.
+4. **Restarting resets the loss cap.** PnL, volume and the halt budget are
+   per-session. Restarting after a halt arms a fresh loss budget - do not
+   restart repeatedly into a market that keeps halting you.
+5. **A halt is a feature.** When it stops on the loss cap it prints why and
+   what to do; the usual cause is a trending market, and the usual fix is
+   waiting for calmer or busier tape.
+6. **LOSS_CAP_MULT encodes your reward math.** This bot deliberately pays
+   maker fees (~$8 per $10,000 traded at 8bp) to print volume. It only makes
+   sense when something (a campaign, a rebate) pays you more per $10k than the
+   halt line. Set LOSS_CAP_MULT so that halt = what your reward is worth:
+   halt $/10k = TAKER_BP_MAX x LOSS_CAP_MULT.
+7. **Calibration is per-symbol and automatic where possible.** The quiet/hot
+   flow threshold auto-measures from the symbol's own 24h tape at startup
+   automatically. Clip sizes and the inventory band are yours
+   to size against your wallet.
+8. **Host matters.** Default is OKX Europe (eea.okx.com). A global OKX account
+   lives on www.okx.com - a different account namespace; set HOST accordingly.
+
+## Troubleshooting
+
+- `50102 Timestamp request expired`: sync your computer clock. (The bot already
+  forces IPv4 because an IPv6 stall to eea.okx.com causes this same error.)
+- Mac `CERTIFICATE_VERIFY_FAILED`: run
+  `/Applications/Python 3.x/Install Certificates.command` (python.org installs).
+- `fill in API_KEY / API_SECRET / API_PASSPHRASE`: the keys at the bottom of
+  bot.py are still empty.
+- HTTP 401: key/secret/passphrase mismatch, or an EEA key used against
+  www.okx.com (or vice versa).

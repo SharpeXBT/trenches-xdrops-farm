@@ -1,0 +1,10 @@
+.env
+run.log
+run.err
+logs/
+__pycache__/
+*.pyc
+*.working-backup.py
+*.bak
+*.env
+!.env.example
