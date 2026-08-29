@@ -19,6 +19,9 @@ after 4x `INVENTORY_BAND_USD` of volume has traded.
 
 ## Requirements
 
+Everything you need lives in ONE folder: `windows/` or `mac/` (bot +
+installer + launcher).
+
 Python 3.9 or newer. Windows: double-click **`windows\INSTALL.bat`** - it
 checks Python and installs it if missing. Mac: double-click **`mac/install.command`**
 (right-click > Open the first time; macOS blocks unknown files on plain double-click).
@@ -34,7 +37,8 @@ Nothing else - no pip installs.
 
 ## Configure
 
-Open bot.py, scroll to the bottom banner `1. YOUR SETTINGS`, and paste your
+Open the bot.py **inside your folder** (`windows/` or `mac/`), scroll to the
+bottom banner `1. YOUR SETTINGS`, and paste your
 three values into `API_KEY` / `API_SECRET` / `API_PASSPHRASE`. The keys never
 leave this file on your machine.
 

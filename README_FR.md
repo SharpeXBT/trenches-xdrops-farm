@@ -14,6 +14,9 @@ récompense vous rapporte plus que ça. Pas de campagne = perte garantie.
 
 ## Étape 1 — Installer (une seule fois)
 
+Tout ce qu'il vous faut est dans UN dossier : `windows` ou `mac` (bot +
+installeur + lanceur).
+
 - **Windows** : ouvrez le dossier **`windows`** et double-cliquez sur
   **`INSTALL.bat`**. Il vérifie Python et l'installe tout seul s'il manque.
 - **Mac** : ouvrez le dossier **`mac`** et double-cliquez sur
@@ -35,7 +38,8 @@ est OKX global (www.okx.com), changez `HOST` dans les réglages (voir Étape 4).
 
 ## Étape 3 — Donner les clés au bot
 
-Ouvrez `bot.py` avec le Bloc-notes (Windows) ou TextEdit (Mac), descendez
+Ouvrez le `bot.py` **de votre dossier** (`windows` ou `mac`) avec le
+Bloc-notes ou TextEdit, descendez
 **tout en bas** jusqu'au bandeau `1. YOUR SETTINGS`, et collez vos trois
 valeurs entre les guillemets :
 
