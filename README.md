@@ -19,8 +19,9 @@ after 4x `INVENTORY_BAND_USD` of volume has traded.
 
 ## Requirements
 
-Python 3.9 or newer. Windows: double-click **`INSTALL_WINDOWS.bat`** - it
-checks Python and installs it if missing. Mac: run `bash install_mac.sh`.
+Python 3.9 or newer. Windows: double-click **`windows\INSTALL.bat`** - it
+checks Python and installs it if missing. Mac: double-click **`mac/install.command`**
+(right-click > Open the first time; macOS blocks unknown files on plain double-click).
 Nothing else - no pip installs.
 
 ## Create an OKX API key
@@ -53,9 +54,8 @@ Fund the account with at least 2x `CLIP_USD` of the quote currency plus
 
 ## Run
 
-- Windows: double-click **`START_WINDOWS.bat`** (or `python bot.py` from a
-  terminal; Git Bash needs `winpty python bot.py`).
-- Mac: `python3 bot.py` from Terminal.
+- Windows: double-click **`windows\START.bat`**.
+- Mac: double-click **`mac/start.command`** (or `python3 bot.py` from Terminal).
 
 It prints a summary of the target and expected cost and asks you to type
 `YES` before placing any order

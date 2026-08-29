@@ -29,8 +29,8 @@ exit /b
 :ready
 echo.
 echo  Everything is ready. Next steps:
-echo    1. Open bot.py with Notepad, scroll to the bottom,
+echo    1. Open bot.py (main folder) with Notepad, scroll to the bottom,
 echo       fill in API_KEY / API_SECRET / API_PASSPHRASE.
-echo    2. Double-click START_WINDOWS.bat
+echo    2. Double-click windows\START.bat
 echo.
 pause

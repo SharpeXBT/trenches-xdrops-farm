@@ -14,9 +14,11 @@ récompense vous rapporte plus que ça. Pas de campagne = perte garantie.
 
 ## Étape 1 — Installer (une seule fois)
 
-- **Windows** : double-cliquez sur **`INSTALL_WINDOWS.bat`**. Il vérifie
-  Python et l'installe tout seul s'il manque. Suivez ce qu'il affiche.
-- **Mac** : ouvrez le Terminal dans le dossier et tapez `bash install_mac.sh`.
+- **Windows** : ouvrez le dossier **`windows`** et double-cliquez sur
+  **`INSTALL.bat`**. Il vérifie Python et l'installe tout seul s'il manque.
+- **Mac** : ouvrez le dossier **`mac`** et double-cliquez sur
+  **`install.command`** (la première fois : clic droit → Ouvrir, macOS bloque
+  le double-clic simple sur un fichier inconnu).
 
 Rien d'autre à installer — aucune librairie, aucun `pip install`.
 
@@ -73,8 +75,8 @@ Financez le compte avec au moins **2× `CLIP_USD` en devise de cotation**
 
 ## Étape 5 — Lancer
 
-- **Windows** : double-cliquez sur **`START_WINDOWS.bat`**.
-- **Mac** : dans le Terminal, tapez `python3 bot.py`.
+- **Windows** : double-cliquez sur **`windows\START.bat`**.
+- **Mac** : double-cliquez sur **`mac/start.command`**.
 
 Le bot affiche la paire, le volume visé, les frais estimés et la ligne d'arrêt,
 puis demande de taper `YES`. Tapez `YES` et Entrée. Ensuite un panneau se met à
