@@ -105,7 +105,11 @@ cost      ce que ça vous a coûté, en $ et par 10 000 $ — avec la ligne d'ar
           fees = les frais (fixes) | drift = le marché qui bouge contre vous
 inv       coins détenus vs le plafond
 book      le carnet, et vos ordres dedans
+last      la dernière action, ou l'erreur complète si elle échoue
 ```
+
+Le bot n'écrit aucun fichier : tout reste dans ce panneau. Une erreur longue
+de l'exchange se replie sur plusieurs lignes au lieu d'être tronquée.
 
 ## Étape 6 — Arrêter
 

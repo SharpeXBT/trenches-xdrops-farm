@@ -83,7 +83,8 @@ It prints a summary of the target and expected cost and asks you to type
 - `book` - best bid/ask and the spread in ticks
 - `last` - the last action or error
 
-Events are also appended to `run.log`.
+The bot writes no files: everything, errors included, stays in this panel.
+A long exchange error wraps across the `last` rows instead of being cut off.
 
 ## Stop safely
 

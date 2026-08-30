@@ -76,7 +76,6 @@ class Config(NamedTuple):
     poll_s: float
     clip_usd_quiet: Decimal
     quiet_flow_per_min: Decimal
-    log_file: str = "run.log"
     run_tag: str = ""
 
 
@@ -361,6 +360,34 @@ def _halt_reason(pnl: Tally, budget: Decimal, elapsed: float, cfg: Config) -> st
     return ""
 
 
+def _wrap(text: str, width: int) -> list[str]:
+    """Split text into lines of at most `width`, breaking on spaces.
+
+    The panel is the only output this bot has, so an exchange error has to be
+    readable inside it. Truncating it to one row cut the message off exactly
+    where the exchange puts its reason code.
+    """
+    if width < 1:
+        raise ValueError(f"width must be positive, got {width}")
+    out: list[str] = []
+    line = ""
+    for word in text.split():
+        while len(word) > width:                 # a URL or a blob with no spaces
+            if line:                             # flush first, or the chunks
+                out.append(line)                 # jump ahead of pending text
+                line = ""
+            out.append(word[:width])
+            word = word[width:]
+        if line and len(line) + 1 + len(word) > width:
+            out.append(line)
+            line = word
+        else:
+            line = f"{line} {word}".strip()
+    if line:
+        out.append(line)
+    return out
+
+
 def _panel(cfg: Config, pnl: Tally, mkt: Decimal | None, st: State, inst: Instrument,
            budget: Decimal, mode: str, last: str, elapsed: float,
            now: datetime, fancy: bool = False) -> str:
@@ -400,6 +427,10 @@ def _panel(cfg: Config, pnl: Tally, mkt: Decimal | None, st: State, inst: Instru
     def row(txt: str) -> str:
         return f"{DIM}{V}{R} " + txt + " " * max(0, W - vis(txt) - 3) + f"{DIM}{V}{R}"
 
+    wrapped = _wrap(last, W - 13) or [""]
+    last_rows = ([row(f"{DIM}last{R}     {wrapped[0]}")]
+                 + [row(" " * 9 + w) for w in wrapped[1:8]])
+
     title = f"{BOLD}{CYN}{cfg.symbol} FARM{R}"
     state = f"{GRN if 'running' in mode.lower() else YEL}{mode.upper()}{R}"
     lines = [
@@ -413,7 +444,7 @@ def _panel(cfg: Config, pnl: Tally, mkt: Decimal | None, st: State, inst: Instru
         row(f"{DIM}inv{R}      {inv_c}${invusd:>10,.0f}{R}   {inv_c}{gauge}{R} {DIM}of ${cfg.inventory_band_usd:,.0f}{R}"),
         row(""),
         row(f"{DIM}book{R}     {bid} {DIM}/{R} {ask}  {DIM}{int((ask - bid) / inst.tick)}t{R}"),
-        row(f"{DIM}last{R}     {last[:W - 13]}"),
+        *last_rows,
         f"{DIM}{BL}{H * (W - 2)}{BR}{R}",
     ]
     return "\n".join(lines)
@@ -458,15 +489,6 @@ def _can_utf8() -> bool:
     except (UnicodeEncodeError, LookupError):
         return False
 
-
-def _log(path: str, line: str) -> None:
-    if not path:
-        return
-    try:
-        with open(path, "a", encoding="utf-8") as fh:
-            fh.write(f"{datetime.now():%m-%d %H:%M:%S} {line}\n")
-    except OSError:
-        pass
 
 _AUTH_OK = False
 
@@ -761,7 +783,6 @@ def run(cfg: Config) -> None:
     cfg = cfg._replace(run_tag=f"{cfg.tag}{datetime.now():%d%H%M%S}")
     fancy = sys.stdout.isatty() and (os.name != "nt" or _vt()) and _can_utf8()
     print(f"session order-id prefix: {cfg.run_tag}")
-    _log(cfg.log_file, f"START prefix={cfg.run_tag} clip=${cfg.clip_usd}/${cfg.clip_usd_quiet} band=${cfg.inventory_band_usd}")
     last_stat = 0.0
     inst = _instrument(cfg)
     fees = _live_fees(cfg)
@@ -821,7 +842,6 @@ def run(cfg: Config) -> None:
             except (RuntimeError, ValueError) as e:
                 fails += 1
                 last = f"! {str(e)[:56]}"
-                _log(cfg.log_file, f"ERR {e}")
                 if fails >= 10:
                     raise RuntimeError(f"10 consecutive exchange failures, last: {e}") from e
                 time.sleep(cfg.poll_s)
@@ -848,9 +868,6 @@ def run(cfg: Config) -> None:
                 print(body, flush=True)
             if time.time() - last_stat >= 60:
                 last_stat = time.time()
-                _log(cfg.log_file, f"STAT vol=${pnl.volume:,.0f} cost=${-pnl.net:+.2f} "
-                                   f"per10k=${(-pnl.net) / pnl.volume * 10000 if pnl.volume else 0:.2f} "
-                                   f"inv=${st.total_base * st.ext_mid:,.0f} clip=${clip_eff}")
             if reason:
                 print(f" stopping: {reason}")
                 if "loss cap" in reason:
@@ -860,7 +877,6 @@ def run(cfg: Config) -> None:
                                " open orders and starts a FRESH loss budget - the cap does not",
                                " carry over). Better: wait for calmer or busier tape first."):
                         print(ln)
-                _log(cfg.log_file, f"stopping: {reason}")
                 break
             action = _decide(st, inst, active, reduce_only=False)
             try:
@@ -876,7 +892,6 @@ def run(cfg: Config) -> None:
                 # the panel truncates to 56 columns, which cuts the exchange's
                 # own reason off; run.log keeps it so a failure can be diagnosed
                 last = f"! {str(e)[:56]}"
-                _log(cfg.log_file, f"ERR {e}")
             # one action per pass, but only pause when there is nothing to do:
             # after placing or cancelling, the other side usually needs work too,
             # and sleeping a full poll there leaves the book half-quoted.
@@ -904,7 +919,6 @@ def run(cfg: Config) -> None:
                 pass
         report = _final_report(pnl, mark > 0, total_base)
         print(report)
-        _log(cfg.log_file, "FINAL " + " ".join(report.split()))
 
 
 def _selfcheck() -> None:

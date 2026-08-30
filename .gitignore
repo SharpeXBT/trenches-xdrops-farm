@@ -1,6 +1,4 @@
 .env
-run.log
-run.err
 logs/
 __pycache__/
 *.pyc
