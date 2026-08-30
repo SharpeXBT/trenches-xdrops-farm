@@ -22,12 +22,14 @@ if sys.version_info < (3, 9):
     raise SystemExit("bot.py needs Python 3.9 or newer; you are running "
                      + sys.version.split()[0] + " - install from python.org")
 
+import atexit
 import base64
 import hashlib
 import hmac
 import json
 import os
 import re
+import signal
 import socket
 import time
 import urllib.error
@@ -784,8 +786,41 @@ def _unwind(cfg: Config, inst: Instrument, seen: set[str], ledger: list[dict],
     _quietly(_collect, cfg, seen, ledger)
 
 
+_LIVE: list = []
+
+
+def _arm_exit_guard(cfg: Config) -> None:
+    """Cancel this symbol's orders on any exit the interpreter still controls.
+
+    Ctrl+C was already handled by run()'s finally, but three exits were not:
+    a SIGTERM, a Ctrl+Break, and any path where the unwind itself dies after
+    re-placing a reducing order. Those left live orders on the book. This is a
+    last-resort net, not a replacement: it runs after the normal unwind and
+    usually finds nothing to do.
+    """
+    _LIVE.append(cfg)
+
+    def sweep() -> None:
+        for c in _LIVE:
+            _quietly(_cancel_symbol, c)
+        _LIVE.clear()
+
+    atexit.register(sweep)
+    for name in ("SIGTERM", "SIGBREAK", "SIGHUP"):
+        sig = getattr(signal, name, None)
+        if sig is None:
+            continue                      # not every signal exists on every OS
+        try:
+            # turn the signal into the KeyboardInterrupt run() already handles,
+            # so the full unwind runs rather than just this bare sweep
+            signal.signal(sig, lambda *_: (_ for _ in ()).throw(KeyboardInterrupt()))
+        except (ValueError, OSError):
+            pass                          # not the main thread, or not supported
+
+
 def run(cfg: Config) -> None:
     cfg = cfg._replace(run_tag=f"{cfg.tag}{datetime.now():%d%H%M%S}")
+    _arm_exit_guard(cfg)
     fancy = sys.stdout.isatty() and (os.name != "nt" or _vt()) and _can_utf8()
     print(f"session order-id prefix: {cfg.run_tag}")
     last_stat = 0.0

@@ -115,8 +115,13 @@ de l'exchange se replie sur plusieurs lignes au lieu d'être tronquée.
 
 - **Ctrl+C** dans la fenêtre : arrêt propre — le bot annule ses ordres et
   revend son inventaire (jusqu'à 2 minutes), puis affiche un bilan `FINAL`.
-- **Fermer la fenêtre d'un coup : à éviter** — des ordres peuvent rester posés.
-  (Le prochain lancement les annule, mais seulement si vous relancez.)
+Les ordres sont aussi annulés sur toute autre sortie que l'interpréteur
+contrôle encore : une erreur non gérée, un `exit` normal, ou un SIGTERM sur Mac
+et Linux.
+
+- **Le seul cas non couvrable : un kill brutal** (`taskkill /F`, Fin de tâche,
+  coupure de courant). Le processus meurt sans exécuter la moindre ligne et les
+  ordres restent posés — jusqu'au prochain démarrage du bot, qui les annule.
 
 ## Quand il s'arrête tout seul
 

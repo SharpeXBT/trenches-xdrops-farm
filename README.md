@@ -93,9 +93,13 @@ A long exchange error wraps across the `last` rows instead of being cut off.
 Press Ctrl+C ONCE. The bot cancels its orders and sells back to flat
 (post-only) for up to `UNWIND_SECONDS`, then prints a final report including
 `base left` (anything it could not sell). Extra Ctrl+C presses are absorbed on
-purpose - do not mash keys at an apparently frozen screen. **Closing the
-terminal window instead kills the process instantly and its orders may be left
-resting** (the next start cancels them, but only if you restart).
+purpose - do not mash keys at an apparently frozen screen.
+
+Orders are also cancelled on any other exit the interpreter still controls: an
+unhandled error, a plain `exit`, or a SIGTERM on Mac and Linux. The one case
+nothing can cover is a hard kill (`taskkill /F`, End Task, a power cut) - there
+the process dies without running any code, and the orders stay until you start
+the bot again, which cancels them.
 
 ## When it stops by itself
 
