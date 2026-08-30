@@ -22,7 +22,7 @@ en dessous, le bot ne peut plus coter du tout.
 
 ## Étape 1 — Installer (une seule fois)
 
-Tout ce qu'il vous faut est dans UN dossier : `windows` ou `mac` (bot +
+Tout ce qu'il vous faut est dans UN dossier : `windows`, `mac` ou `linux` (bot +
 installeur + lanceur).
 
 - **Windows** : ouvrez le dossier **`windows`** et double-cliquez sur
@@ -30,6 +30,9 @@ installeur + lanceur).
 - **Mac** : ouvrez le dossier **`mac`** et double-cliquez sur
   **`install.command`** (la première fois : clic droit → Ouvrir, macOS bloque
   le double-clic simple sur un fichier inconnu).
+- **Linux** : dans le dossier **`linux`**, lancez `bash install.sh` depuis un
+  terminal. Il installe Python via apt / dnf / pacman / zypper / apk selon
+  votre distribution.
 
 Rien d'autre à installer — aucune librairie, aucun `pip install`.
 
@@ -46,7 +49,7 @@ est OKX global (www.okx.com), changez `HOST` dans les réglages (voir Étape 4).
 
 ## Étape 3 — Donner les clés au bot
 
-Ouvrez le `bot.py` **de votre dossier** (`windows` ou `mac`) avec le
+Ouvrez le `bot.py` **de votre dossier** (`windows`, `mac` ou `linux`) avec le
 Bloc-notes ou TextEdit, descendez
 **tout en bas** jusqu'au bandeau `1. YOUR SETTINGS`, et collez vos trois
 valeurs entre les guillemets :
@@ -90,6 +93,7 @@ Financez le compte avec au moins **2× `CLIP_USD` en devise de cotation**
 
 - **Windows** : double-cliquez sur **`windows\START.bat`**.
 - **Mac** : double-cliquez sur **`mac/start.command`**.
+- **Linux** : lancez **`./linux/start.sh`**.
 
 Le bot affiche la paire, le volume visé, les frais estimés et la ligne d'arrêt,
 puis demande de taper `YES`. Tapez `YES` et Entrée. Ensuite un panneau se met à

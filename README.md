@@ -24,12 +24,14 @@ clip below it means the bot can never quote.
 
 ## Requirements
 
-Everything you need lives in ONE folder: `windows/` or `mac/` (bot +
+Everything you need lives in ONE folder: `windows/`, `mac/` or `linux/` (bot +
 installer + launcher).
 
 Python 3.9 or newer. Windows: double-click **`windows\INSTALL.bat`** - it
 checks Python and installs it if missing. Mac: double-click **`mac/install.command`**
 (right-click > Open the first time; macOS blocks unknown files on plain double-click).
+Linux: run **`bash linux/install.sh`** - it installs Python through apt, dnf,
+pacman, zypper or apk, whichever your distribution has.
 Nothing else - no pip installs.
 
 ## Create an OKX API key
@@ -42,7 +44,7 @@ Nothing else - no pip installs.
 
 ## Configure
 
-Open the bot.py **inside your folder** (`windows/` or `mac/`), scroll to the
+Open the bot.py **inside your folder** (`windows/`, `mac/` or `linux/`), scroll to the
 bottom banner `1. YOUR SETTINGS`, and paste your
 three values into `API_KEY` / `API_SECRET` / `API_PASSPHRASE`. The keys never
 leave this file on your machine.
@@ -66,6 +68,7 @@ Fund the account with at least 2x `CLIP_USD` of the quote currency plus
 
 - Windows: double-click **`windows\START.bat`**.
 - Mac: double-click **`mac/start.command`** (or `python3 bot.py` from Terminal).
+- Linux: run **`./linux/start.sh`** (or `python3 bot.py`).
 
 It prints a summary of the target and expected cost and asks you to type
 `YES` before placing any order
