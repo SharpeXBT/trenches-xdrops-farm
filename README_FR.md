@@ -142,8 +142,14 @@ book      le carnet, et vos ordres dedans
 
 - `fill in API_KEY / API_SECRET / API_PASSPHRASE` : les clés sont vides —
   retournez à l'Étape 3.
-- `HTTP 401` : clé/secret/passphrase faux, ou `HOST` ne correspond pas à votre
-  type de compte (Europe vs global).
+- `HTTP 401` **au moment de poser un ordre, alors que le panneau s'affiche
+  déjà** : la clé est valide mais en lecture seule. Le démarrage lit vos frais
+  et votre solde avec la même signature — s'il est allé jusque-là, il ne manque
+  que la permission **Trade** (OKX → Profil → API → votre clé). Si vous avez mis
+  une liste blanche d'IP, ajoutez-y l'IP d'où vous lancez. Le bot s'arrête
+  désormais avec ce message au lieu de réessayer indéfiniment.
+- `HTTP 401` **dès le démarrage** : clé/secret/passphrase faux, ou `HOST` ne
+  correspond pas à votre type de compte (Europe vs global).
 - `account fees are worse...` : votre palier de frais dépasse 8/10 bp — le bot
   refuse car le modèle de coût ne tient plus.
 - Panneau figé / caractères bizarres : utilisez Windows Terminal ou le Terminal

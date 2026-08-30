@@ -485,7 +485,22 @@ def _request(cfg: Config, method: str, path: str, body: dict | None = None,
         with urllib.request.urlopen(req, timeout=20) as r:
             parsed = json.loads(r.read().decode())
     except urllib.error.HTTPError as e:
-        raise RuntimeError(f"{method} {path} HTTP {e.code}: {e.read().decode()[:200]}") from e
+        detail = e.read().decode()[:200]
+        # 401 is never transient, and retrying it just spins forever. Reads use
+        # the very same signature, so if startup read your fees and balance the
+        # key is valid and the only thing missing is permission to trade.
+        if e.code == 401:
+            raise PermissionError(
+                "OKX refused " + method + " " + path + " with HTTP 401.\n"
+                "  OKX said: " + detail + "\n"
+                "  Startup already read your fees and balance with this same key,\n"
+                "  so the key, secret, passphrase and clock are all fine.\n"
+                "  Fix, in order of likelihood:\n"
+                "   1. OKX > Profile > API > your key > tick the TRADE permission.\n"
+                "      A read-only key reads balances but cannot place orders.\n"
+                "   2. If you set an IP whitelist, add the IP you run from.\n"
+                "   3. If you just changed either, wait a minute and start again.") from e
+        raise RuntimeError(f"{method} {path} HTTP {e.code}: {detail}") from e
     except Exception as e:
         msg = f"{method} {path} failed: {type(e).__name__} {e}"
         if "CERTIFICATE_VERIFY_FAILED" in str(e):
@@ -914,5 +929,7 @@ if __name__ == "__main__":
             if ok != "YES":
                 raise SystemExit("aborted")
         run(cfg)
+    except PermissionError as e:
+        raise SystemExit(f"\nSTOPPED - {e}")
     except (ValueError, RuntimeError) as e:
         raise SystemExit(f"error: {e}")

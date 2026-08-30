@@ -141,5 +141,10 @@ fees worse than `MAKER_BP_MAX` / `TAKER_BP_MAX` at startup.
   `/Applications/Python 3.x/Install Certificates.command` (python.org installs).
 - `fill in API_KEY / API_SECRET / API_PASSPHRASE`: the keys at the bottom of
   bot.py are still empty.
-- HTTP 401: key/secret/passphrase mismatch, or an EEA key used against
-  www.okx.com (or vice versa).
+- HTTP 401 **when placing an order, after the panel already appeared**: the key
+  is valid but read-only. Startup reads your fees and balance with the same
+  signature, so if it got that far, tick **Trade** on the key (OKX > Profile >
+  API), or add your IP if you set a whitelist. The bot now stops and says so
+  instead of retrying forever.
+- HTTP 401 **at startup**: key/secret/passphrase mismatch, or an EEA key used
+  against www.okx.com (or vice versa).
