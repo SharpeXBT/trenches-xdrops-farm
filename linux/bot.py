@@ -980,7 +980,10 @@ if __name__ == "__main__":
                 ok = input("Type YES to start: ").strip()
             except (EOFError, KeyboardInterrupt):
                 ok = ""
-            if ok != "YES":
+            # accept yes/Yes/YES: a case-sensitive gate reads as a broken bot to
+            # someone who has not seen the code, and they give up before they
+            # ever find out whether their API keys work
+            if ok.upper() != "YES":
                 raise SystemExit("aborted")
         run(cfg)
     except PermissionError as e:
