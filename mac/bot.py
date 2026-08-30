@@ -830,7 +830,10 @@ def run(cfg: Config) -> None:
                     last = f"wait ({action.why})"
             except (RuntimeError, ValueError) as e:
                 last = f"! {str(e)[:56]}"
-            time.sleep(cfg.poll_s)
+            # one action per pass, but only pause when there is nothing to do:
+            # after placing or cancelling, the other side usually needs work too,
+            # and sleeping a full poll there leaves the book half-quoted.
+            time.sleep(cfg.poll_s if action.kind == "wait" else BUSY_PAUSE_SECONDS)
     except KeyboardInterrupt:
         last = "interrupted"
     finally:
@@ -887,6 +890,7 @@ HOST = "https://eea.okx.com"     # OKX Europe; global accounts use https://www.o
 CLIP_USD = 300                   # quote size when the market is busy
 CLIP_USD_QUIET = 50              # quote size when it is quiet
 INVENTORY_BAND_USD = 300         # hard ceiling on how much base coin the bot may hold
+BUSY_PAUSE_SECONDS = 0.15        # pause after an action (vs POLL when idle)
 LOSS_CAP_MULT = 1.39             # halts at TAKER fee x this per $10k of volume;
                                  # set it just under what your reward pays per $10k
 
