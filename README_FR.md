@@ -80,6 +80,7 @@ Tout en bas de `bot.py`, deux zones :
 | `CLIP_USD` | taille d'un ordre quand le marché est actif |
 | `CLIP_USD_QUIET` | taille quand le marché est calme (le seuil se mesure tout seul) |
 | `INVENTORY_BAND_USD` | plafond dur de coins détenus ; l'achat ralentit puis s'arrête en approchant |
+| `BUSY_PAUSE_SECONDS` | pause après avoir posé ou annulé ; l'attente complète ne s'applique qu'au repos |
 | `LOSS_CAP_MULT` | ligne d'arrêt : stoppe à `frais taker × ceci` par 10 000 $ ; mettez-la juste SOUS ce que votre récompense paie par 10 000 $ |
 
 Financez le compte avec au moins **2× `CLIP_USD` en devise de cotation**

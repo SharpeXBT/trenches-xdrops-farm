@@ -56,6 +56,7 @@ Then set, in the same place:
 | `CLIP_USD` | size of one quote; fund ~2x this in the quote currency to hold both sides |
 | `CLIP_USD_QUIET` | smaller clip used when the tape is quiet (the busy/quiet threshold self-measures from the symbol's 24h tape) |
 | `INVENTORY_BAND_USD` | hard ceiling on directional exposure; buying tapers to zero at it |
+| `BUSY_PAUSE_SECONDS` | pause after placing or cancelling; the full `POLL` wait only applies when idle |
 | `LOSS_CAP_MULT` | the halt line: halts at `TAKER fee x this` per $10k; set it just under what your reward pays per $10k |
 
 Fund the account with at least 2x `CLIP_USD` of the quote currency plus
