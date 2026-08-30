@@ -880,18 +880,18 @@ API_SECRET = ""                  # OKX API secret
 API_PASSPHRASE = ""              # OKX API passphrase
 
 SYMBOL = "RE-USDC"               # the spot pair to farm, BASE-QUOTE
-TARGET_VOLUME_USD = 400000       # stop after this much volume (buys + sells count)
+TARGET_VOLUME_USD = 10000        # stop after this much volume (buys + sells count)
 
 # =============================================================================
 #  2. TUNING - safe defaults; change only if you know why
 # =============================================================================
 
 HOST = "https://eea.okx.com"     # OKX Europe; global accounts use https://www.okx.com
-CLIP_USD = 300                   # quote size when the market is busy
-CLIP_USD_QUIET = 50              # quote size when it is quiet
-INVENTORY_BAND_USD = 300         # hard ceiling on how much base coin the bot may hold
+CLIP_USD = 50                    # quote size when the market is busy
+CLIP_USD_QUIET = 25              # quote size when it is quiet
+INVENTORY_BAND_USD = 100         # hard ceiling on how much base coin the bot may hold
 BUSY_PAUSE_SECONDS = 0.15        # pause after an action (vs POLL when idle)
-LOSS_CAP_MULT = 1.39             # halts at TAKER fee x this per $10k of volume;
+LOSS_CAP_MULT = 1.20             # halts at TAKER fee x this per $10k of volume;
                                  # set it just under what your reward pays per $10k
 
 if __name__ == "__main__":

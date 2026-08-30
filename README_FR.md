@@ -10,6 +10,11 @@ qu'il coûte.
 environ **8 à 10 $ pour 10 000 $ de volume**. Il n'est rentable QUE si une
 récompense vous rapporte plus que ça. Pas de campagne = perte garantie.
 
+Les valeurs par défaut sont volontairement petites : **$200 exposés au maximum**
+(deux ordres + la bande d'inventaire), cible de $10 000 de volume, arrêt
+automatique vers $12 de perte. N'augmentez les tailles qu'après avoir observé
+un run complet.
+
 ---
 
 ## Étape 1 — Installer (une seule fois)
