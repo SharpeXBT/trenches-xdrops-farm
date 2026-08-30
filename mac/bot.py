@@ -186,7 +186,12 @@ def _quote_prices(ext_bid: Decimal, ext_ask: Decimal, tick: Decimal) -> tuple[De
     # land strictly inside: bid = ext_bid+1t, ask = bid+1t (or ext_ask-1t when
     # diming), ask < ext_ask -> at least 3 ticks of room.
     if ext_ask - ext_bid < tick * 3:
-        return None
+        # No room inside, so JOIN both touches rather than stand aside. A
+        # post-only at the best bid does not cross - it queues behind what is
+        # already there. Standing aside here costs the whole busy regime: the
+        # book is tightest exactly when the tape is heaviest, and RE-USDC sits
+        # under 3 ticks ~40% of the time.
+        return ext_bid, ext_ask
     bid = ext_bid + tick
     ask = bid + tick
     if ask >= ext_ask or ask <= bid:
@@ -924,7 +929,10 @@ def run(cfg: Config) -> None:
 def _selfcheck() -> None:
     tick = Decimal("0.0001")
     assert _quote_prices(Decimal("1.0000"), Decimal("1.0003"), tick) == (Decimal("1.0001"), Decimal("1.0002"))
-    assert _quote_prices(Decimal("1.0000"), Decimal("1.0002"), tick) is None
+    assert _quote_prices(Decimal("1.0000"), Decimal("1.0002"), tick) == (Decimal("1.0000"),
+                                                                         Decimal("1.0002"))
+    assert _quote_prices(Decimal("1.0000"), Decimal("1.0001"), tick) == (Decimal("1.0000"),
+                                                                         Decimal("1.0001"))
     assert _floor_lot(Decimal("7.9"), Decimal(1)) == Decimal(7)
     assert _external_book([(Decimal(1), Decimal(5))], {Decimal(1): Decimal(5)}) == []
     t = _tally([{"fillPx": "1", "fillSz": "10", "side": "buy", "fee": "-0.008",
