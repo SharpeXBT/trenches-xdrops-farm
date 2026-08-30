@@ -468,6 +468,37 @@ def _log(path: str, line: str) -> None:
     except OSError:
         pass
 
+_AUTH_OK = False
+
+
+def _diagnose_401(method: str, path: str, detail: str) -> str:
+    """Name the ONE cause that fits, from whether a private call ever succeeded.
+
+    Both causes return the same HTTP 401, and telling a user to fix the wrong
+    one costs them the session. The discriminator is free: reads and writes are
+    signed identically, so a key that has already read cannot be mis-signed.
+    """
+    head = (f"OKX refused {method} {path} with HTTP 401.\n"
+            f"  OKX said: {detail}\n")
+    if _AUTH_OK:
+        return head + (
+            "  An earlier private call with this same key SUCCEEDED, so the key,\n"
+            "  secret, passphrase, clock and IP allowlist are all correct.\n"
+            "  What is missing is permission:\n"
+            "    OKX > Profile > API > your key > tick TRADE (leave Withdraw off).\n"
+            "    A read-only key reads balances but cannot place orders.\n"
+            "  If you just ticked it, wait a minute and start again.")
+    return head + (
+        "  This is the FIRST private call, and it failed - so the problem is\n"
+        "  the credentials or where you are calling from, not permissions:\n"
+        "    1. IP allowlist: if the key has one, it must list the IP you run\n"
+        "       from. Check yours at https://ifconfig.me and compare.\n"
+        "    2. API_KEY / API_SECRET / API_PASSPHRASE: retype all three; the\n"
+        "       passphrase is the one you chose, not your login password.\n"
+        "    3. HOST: an eea.okx.com key does not work on www.okx.com, and\n"
+        "       vice versa - they are separate accounts.")
+
+
 def _request(cfg: Config, method: str, path: str, body: dict | None = None,
              private: bool = True) -> list:
     payload = json.dumps(body, separators=(",", ":")) if body is not None else ""
@@ -486,26 +517,21 @@ def _request(cfg: Config, method: str, path: str, body: dict | None = None,
             parsed = json.loads(r.read().decode())
     except urllib.error.HTTPError as e:
         detail = e.read().decode()[:200]
-        # 401 is never transient, and retrying it just spins forever. Reads use
-        # the very same signature, so if startup read your fees and balance the
-        # key is valid and the only thing missing is permission to trade.
+        # 401 is never transient, and retrying it just spins forever. Which of
+        # the two causes it is depends entirely on whether ANY private call has
+        # worked yet: the same signature covers reads and writes, so a key that
+        # has read your balance can only be failing on permission.
         if e.code == 401:
-            raise PermissionError(
-                "OKX refused " + method + " " + path + " with HTTP 401.\n"
-                "  OKX said: " + detail + "\n"
-                "  Startup already read your fees and balance with this same key,\n"
-                "  so the key, secret, passphrase and clock are all fine.\n"
-                "  Fix, in order of likelihood:\n"
-                "   1. OKX > Profile > API > your key > tick the TRADE permission.\n"
-                "      A read-only key reads balances but cannot place orders.\n"
-                "   2. If you set an IP whitelist, add the IP you run from.\n"
-                "   3. If you just changed either, wait a minute and start again.") from e
+            raise PermissionError(_diagnose_401(method, path, detail)) from e
         raise RuntimeError(f"{method} {path} HTTP {e.code}: {detail}") from e
     except Exception as e:
         msg = f"{method} {path} failed: {type(e).__name__} {e}"
         if "CERTIFICATE_VERIFY_FAILED" in str(e):
             msg += " (Mac python.org install: run /Applications/Python 3.x/Install Certificates.command)"
         raise RuntimeError(msg) from e
+    if private:
+        global _AUTH_OK
+        _AUTH_OK = True
     if not isinstance(parsed, dict) or parsed.get("code") not in ("0", 0):
         raise RuntimeError(f"{method} {path} okx error: {str(parsed)[:200]}")
     data = parsed.get("data")
