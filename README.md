@@ -12,12 +12,15 @@ liquidity while running. One file, standard library only.
 
 You pay the maker fee on every dollar of volume plus roughly half a tick of
 price drift per round trip. At an 8bp maker fee that is about $8-10 per $10,000
-traded. At the default `TARGET_VOLUME_USD = 10000` expect roughly $8-10
+traded. At the default `TARGET_VOLUME_USD = 5000` expect roughly $4-5
 total. The bot hard-halts if realised loss exceeds
-`LOSS_CAP_MULT x` the priced budget (~$12 at defaults); the cap arms only
+`LOSS_CAP_MULT x` the priced budget (~$6 at defaults); the cap arms only
 after 4x `INVENTORY_BAND_USD` of volume has traded. Defaults are deliberately
-small: at most $200 is ever exposed (two quotes plus the inventory band). Raise
+small: at most $140 is ever exposed (two quotes plus the inventory band). Raise
 the sizes only once you have watched a full run.
+
+Check your pair's minimum order size before shrinking `CLIP_USD` further - a
+clip below it means the bot can never quote.
 
 ## Requirements
 

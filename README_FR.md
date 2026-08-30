@@ -10,10 +10,13 @@ qu'il coûte.
 environ **8 à 10 $ pour 10 000 $ de volume**. Il n'est rentable QUE si une
 récompense vous rapporte plus que ça. Pas de campagne = perte garantie.
 
-Les valeurs par défaut sont volontairement petites : **$200 exposés au maximum**
-(deux ordres + la bande d'inventaire), cible de $10 000 de volume, arrêt
-automatique vers $12 de perte. N'augmentez les tailles qu'après avoir observé
+Les valeurs par défaut sont volontairement petites : **$140 exposés au maximum**
+(deux ordres + la bande d'inventaire), cible de $5 000 de volume, arrêt
+automatique vers $6 de perte. N'augmentez les tailles qu'après avoir observé
 un run complet.
+
+Vérifiez la taille minimale d'ordre de votre paire avant de réduire `CLIP_USD` :
+en dessous, le bot ne peut plus coter du tout.
 
 ---
 
