@@ -821,6 +821,7 @@ def run(cfg: Config) -> None:
             except (RuntimeError, ValueError) as e:
                 fails += 1
                 last = f"! {str(e)[:56]}"
+                _log(cfg.log_file, f"ERR {e}")
                 if fails >= 10:
                     raise RuntimeError(f"10 consecutive exchange failures, last: {e}") from e
                 time.sleep(cfg.poll_s)
@@ -872,7 +873,10 @@ def run(cfg: Config) -> None:
                 else:
                     last = f"wait ({action.why})"
             except (RuntimeError, ValueError) as e:
+                # the panel truncates to 56 columns, which cuts the exchange's
+                # own reason off; run.log keeps it so a failure can be diagnosed
                 last = f"! {str(e)[:56]}"
+                _log(cfg.log_file, f"ERR {e}")
             # one action per pass, but only pause when there is nothing to do:
             # after placing or cancelling, the other side usually needs work too,
             # and sleeping a full poll there leaves the book half-quoted.
