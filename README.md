@@ -144,7 +144,9 @@ fees worse than `MAKER_BP_MAX` / `TAKER_BP_MAX` at startup.
 - HTTP 401 **when placing an order, after the panel already appeared**: the key
   is valid but read-only. Startup reads your fees and balance with the same
   signature, so if it got that far, tick **Trade** on the key (OKX > Profile >
-  API), or add your IP if you set a whitelist. The bot now stops and says so
-  instead of retrying forever.
-- HTTP 401 **at startup**: key/secret/passphrase mismatch, or an EEA key used
-  against www.okx.com (or vice versa).
+  API). The bot now stops and says so instead of retrying forever.
+- HTTP 401 **at startup**: key/secret/passphrase mismatch, an EEA key used
+  against www.okx.com (or vice versa), or an IP allowlist that does not list
+  you. The bot connects over **IPv4**, so compare the key's allowlist against
+  <https://api.ipify.org> - a page answering in IPv6 shows an address that can
+  never match an IPv4 entry.

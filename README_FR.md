@@ -145,11 +145,13 @@ book      le carnet, et vos ordres dedans
 - `HTTP 401` **au moment de poser un ordre, alors que le panneau s'affiche
   déjà** : la clé est valide mais en lecture seule. Le démarrage lit vos frais
   et votre solde avec la même signature — s'il est allé jusque-là, il ne manque
-  que la permission **Trade** (OKX → Profil → API → votre clé). Si vous avez mis
-  une liste blanche d'IP, ajoutez-y l'IP d'où vous lancez. Le bot s'arrête
+  que la permission **Trade** (OKX → Profil → API → votre clé). Le bot s'arrête
   désormais avec ce message au lieu de réessayer indéfiniment.
-- `HTTP 401` **dès le démarrage** : clé/secret/passphrase faux, ou `HOST` ne
-  correspond pas à votre type de compte (Europe vs global).
+- `HTTP 401` **dès le démarrage** : clé/secret/passphrase faux, `HOST` qui ne
+  correspond pas à votre type de compte (Europe vs global), ou une liste
+  blanche d'IP qui ne vous inclut pas. Le bot se connecte en **IPv4** :
+  comparez la liste blanche à <https://api.ipify.org>, pas à une page qui
+  répond en IPv6 — cette adresse-là ne pourra jamais correspondre.
 - `account fees are worse...` : votre palier de frais dépasse 8/10 bp — le bot
   refuse car le modèle de coût ne tient plus.
 - Panneau figé / caractères bizarres : utilisez Windows Terminal ou le Terminal

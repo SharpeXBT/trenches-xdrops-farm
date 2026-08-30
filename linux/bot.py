@@ -491,8 +491,10 @@ def _diagnose_401(method: str, path: str, detail: str) -> str:
     return head + (
         "  This is the FIRST private call, and it failed - so the problem is\n"
         "  the credentials or where you are calling from, not permissions:\n"
-        "    1. IP allowlist: if the key has one, it must list the IP you run\n"
-        "       from. Check yours at https://ifconfig.me and compare.\n"
+        "    1. IP allowlist: if the key has one, it must list the IPv4 you\n"
+        "       run from. This bot always connects over IPv4, so read it\n"
+        "       at https://api.ipify.org - a page that answers in IPv6\n"
+        "       shows an address that can never match an IPv4 entry.\n"
         "    2. API_KEY / API_SECRET / API_PASSPHRASE: retype all three; the\n"
         "       passphrase is the one you chose, not your login password.\n"
         "    3. HOST: an eea.okx.com key does not work on www.okx.com, and\n"
