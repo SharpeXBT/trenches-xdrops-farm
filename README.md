@@ -61,10 +61,24 @@ Then set, in the same place:
 | `CLIP_USD_QUIET` | smaller clip used when the tape is quiet (the busy/quiet threshold self-measures from the symbol's 24h tape) |
 | `INVENTORY_BAND_USD` | hard ceiling on directional exposure; buying tapers to zero at it |
 | `BUSY_PAUSE_SECONDS` | pause after placing or cancelling; the full `POLL` wait only applies when idle |
-| `LOSS_CAP_MULT` | the halt line: halts at `TAKER fee x this` per $10k; set it just under what your reward pays per $10k |
+| `LOSS_CAP_MULT` | the halt line in $ per $10k of volume: `REFUSE_IF_TAKER_BP_OVER x this`. At 10.0 x 1.20 it stops near $12/$10k. Set it just under what your reward pays per $10k |
+| `REFUSE_IF_MAKER_BP_OVER` | **not your fees.** The bot reads your real tier from OKX at startup and refuses to run if it is worse than this |
+| `REFUSE_IF_TAKER_BP_OVER` | same on the taker side. Also the base of the halt line above |
 
 Fund the account with at least 2x `CLIP_USD` of the quote currency plus
 `INVENTORY_BAND_USD` of headroom.
+
+The bot restates all of it before asking for `YES`: target volume, quote size,
+expected fees and the halt line, each also given as **$ per $10k of volume** -
+the only unit comparable to what a campaign pays.
+
+Five finer settings (`WARMUP_VOLUME_USD`, `SPEND_FRACTION`,
+`MAX_RUNTIME_SECONDS`, `UNWIND_SECONDS`, `QUIET_FLOW_USD_PER_MIN`) keep their
+defaults inside `_config`, whose docstring documents each one, its contract and
+its value. The one that surprises people most: the loss cap only arms after
+**4x `INVENTORY_BAND_USD`** of volume, so a bot losing in its first minutes
+will not halt straight away - deliberately, since early PnL is one lucky or
+unlucky fill rather than signal.
 
 ## Run
 
@@ -72,8 +86,8 @@ Fund the account with at least 2x `CLIP_USD` of the quote currency plus
 - Mac: double-click **`mac/start.command`** (or `python3 bot.py` from Terminal).
 - Linux: run **`./linux/start.sh`** (or `python3 bot.py`).
 
-It prints a summary of the target and expected cost and asks you to type
-`YES` before placing any order
+It prints the preflight - target, quote sizes, expected fees and halt line, each
+in $ and in $ per $10k - and asks you to type `YES` before placing any order
 (skipped when input is not a terminal, so headless deploys don't hang).
 
 ## The panel
@@ -105,7 +119,8 @@ the bot again, which cancels them.
 
 target reached | loss cap (after warmup) |
 10 consecutive exchange failures | no usable order book for 120s | account
-fees worse than `MAKER_BP_MAX` / `TAKER_BP_MAX` at startup.
+fees worse than `REFUSE_IF_MAKER_BP_OVER` / `REFUSE_IF_TAKER_BP_OVER` at
+startup.
 
 ## Shared state & assumptions (read before running on a funded account)
 
@@ -120,8 +135,10 @@ fees worse than `MAKER_BP_MAX` / `TAKER_BP_MAX` at startup.
    be mistaken for this bot's inventory. Other pairs on the same account are
    fine; they only share the quote-currency wallet.
 3. **Fees:** built for VIP0/VIP1 (8bp maker / 10bp taker). It reads your real
-   tier at startup and refuses to run if yours is worse than MAKER_BP_MAX /
-   TAKER_BP_MAX.
+   tier at startup and refuses to run if yours is worse than
+   REFUSE_IF_MAKER_BP_OVER / REFUSE_IF_TAKER_BP_OVER. Those two are guards,
+   not fee settings - raising them does not make trading cheaper, it only
+   removes the alarm.
 4. **Restarting resets the loss cap.** PnL, volume and the halt budget are
    per-session. Restarting after a halt arms a fresh loss budget - do not
    restart repeatedly into a market that keeps halting you.
@@ -132,7 +149,7 @@ fees worse than `MAKER_BP_MAX` / `TAKER_BP_MAX` at startup.
    maker fees (~$8 per $10,000 traded at 8bp) to print volume. It only makes
    sense when something (a campaign, a rebate) pays you more per $10k than the
    halt line. Set LOSS_CAP_MULT so that halt = what your reward is worth:
-   halt $/10k = TAKER_BP_MAX x LOSS_CAP_MULT.
+   halt $/10k = REFUSE_IF_TAKER_BP_OVER x LOSS_CAP_MULT.
 7. **Calibration is per-symbol and automatic where possible.** The quiet/hot
    flow threshold auto-measures from the symbol's own 24h tape at startup
    automatically. Clip sizes and the inventory band are yours

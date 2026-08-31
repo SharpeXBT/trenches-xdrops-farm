@@ -84,10 +84,25 @@ Tout en bas de `bot.py`, deux zones :
 | `CLIP_USD_QUIET` | taille quand le marché est calme (le seuil se mesure tout seul) |
 | `INVENTORY_BAND_USD` | plafond dur de coins détenus ; l'achat ralentit puis s'arrête en approchant |
 | `BUSY_PAUSE_SECONDS` | pause après avoir posé ou annulé ; l'attente complète ne s'applique qu'au repos |
-| `LOSS_CAP_MULT` | ligne d'arrêt : stoppe à `frais taker × ceci` par 10 000 $ ; mettez-la juste SOUS ce que votre récompense paie par 10 000 $ |
+| `LOSS_CAP_MULT` | ligne d'arrêt en $ par 10 000 $ de volume : `REFUSE_IF_TAKER_BP_OVER × ceci`. À 10,0 × 1,20 le bot s'arrête vers 12 $/10k. Mettez-la juste SOUS ce que votre récompense paie par 10 000 $ |
+| `REFUSE_IF_MAKER_BP_OVER` | **ce ne sont pas vos frais.** Le bot lit votre vrai palier chez OKX au démarrage et refuse de tourner s'il est pire que ça |
+| `REFUSE_IF_TAKER_BP_OVER` | idem côté taker. Sert aussi de base au calcul de la ligne d'arrêt ci-dessus |
 
 Financez le compte avec au moins **2× `CLIP_USD` en devise de cotation**
 (ex. USDC) plus la marge de `INVENTORY_BAND_USD`.
+
+Le bot affiche tout ça en clair avant de demander `YES` : volume visé, taille
+des ordres, frais attendus, ligne d'arrêt — chaque chiffre aussi ramené au
+**$ par 10 000 $ de volume**, la seule unité comparable à ce que paie une
+campagne.
+
+Cinq réglages plus fins (`WARMUP_VOLUME_USD`, `SPEND_FRACTION`,
+`MAX_RUNTIME_SECONDS`, `UNWIND_SECONDS`, `QUIET_FLOW_USD_PER_MIN`) gardent
+leurs valeurs par défaut dans `_config` : son docstring documente chacun, son
+contrat et sa valeur. À noter, celui qui surprend le plus : le loss cap ne
+s'arme qu'après **4× `INVENTORY_BAND_USD`** de volume, donc un bot qui perd
+dans ses premières minutes ne s'arrêtera pas tout de suite — c'est voulu, un
+PnL de départ n'est qu'un fill chanceux ou non.
 
 ## Étape 5 — Lancer
 
@@ -142,7 +157,7 @@ et Linux.
    même tradez aussi.
 3. **Relancer remet la limite de perte à zéro** (voir ci-dessus).
 4. **`LOSS_CAP_MULT` encode VOTRE campagne.** Formule : arrêt en $/10k =
-   frais taker (bp) × `LOSS_CAP_MULT`. Exemple : récompense de 14 $/10k et
+   `REFUSE_IF_TAKER_BP_OVER` × `LOSS_CAP_MULT`. Exemple : récompense de 14 $/10k et
    frais taker 10 bp → mettez 1,39 pour stopper à 13,90 $/10k.
 5. Conçu pour VIP0/VIP1 (8 bp maker / 10 bp taker). Le bot vérifie vos vrais
    frais au démarrage et refuse de tourner s'ils sont pires.
@@ -161,7 +176,7 @@ et Linux.
   blanche d'IP qui ne vous inclut pas. Le bot se connecte en **IPv4** :
   comparez la liste blanche à <https://api.ipify.org>, pas à une page qui
   répond en IPv6 — cette adresse-là ne pourra jamais correspondre.
-- `account fees are worse...` : votre palier de frais dépasse 8/10 bp — le bot
+- `your real OKX fees are...` : votre palier dépasse 8/10 bp — le bot
   refuse car le modèle de coût ne tient plus.
 - Panneau figé / caractères bizarres : utilisez Windows Terminal ou le Terminal
   Mac ; le bot bascule tout seul en affichage simple si la console ne suit pas.

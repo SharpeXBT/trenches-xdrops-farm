@@ -76,6 +76,7 @@ class Config(NamedTuple):
     max_runtime_s: float
     unwind_s: float
     poll_s: float
+    busy_pause_s: float
     clip_usd_quiet: Decimal
     quiet_flow_per_min: Decimal
     run_tag: str = ""
@@ -218,7 +219,70 @@ def _config(host: str, symbol: str, api_key: str, api_secret: str,
             inventory_band_usd, loss_cap_mult, clip_usd_quiet=None,
             maker_bp_max=8.0, taker_bp_max=10.0, spend_fraction=Decimal("0.98"),
             warmup_volume_usd=None, max_runtime_s=0, unwind_s=120, poll_s=1.0,
-            quiet_flow_per_min=0, tag="REF") -> Config:
+            busy_pause_s=0.15, quiet_flow_per_min=0, tag="REF") -> Config:
+    """Validate every setting once, at the boundary, before anything goes live.
+
+    This is the contract for the whole bot. Nine of these are edited by hand in
+    the settings block at the bottom of this file; the rest keep the defaults
+    below, and this docstring is the only place those defaults are written
+    down. Nothing here touches the network: a bad setting must fail here, with
+    a message naming what to fix, rather than mid-session with money at risk.
+
+    Parameters
+    ----------
+    host: OKX base URL. `https://eea.okx.com` for a European account,
+        `https://www.okx.com` for a global one. They are separate account
+        namespaces - keys from one do not work on the other.
+    symbol: spot pair as BASE-QUOTE, e.g. `RE-USDC`.
+    api_key, api_secret, api_passphrase: OKX credentials with the Trade
+        permission and NOT withdrawal. Empty strings fall back to the
+        `OKX_API_KEY` / `OKX_API_SECRET` / `OKX_API_PASSPHRASE` environment
+        variables.
+    clip_usd: size of one quote in quote currency. Must not exceed
+        `inventory_band_usd`, or a single fill would breach the band.
+    target_volume_usd: stop after this much traded. Buys and sells both count,
+        so $5,000 here is roughly $2,500 each way.
+    inventory_band_usd: hard ceiling on base coin the bot may hold. Buying
+        tapers to zero as inventory approaches it.
+    loss_cap_mult: multiplier on the priced budget that sets the halt line.
+        Halt happens near `taker_bp_max * loss_cap_mult` dollars per $10k of
+        volume - the live line is slightly higher because `_budget` also prices
+        half the spread. Set it just under what your reward pays per $10k.
+    clip_usd_quiet: smaller quote size for a quiet tape. `None` means reuse
+        `clip_usd`. Must not exceed it.
+    maker_bp_max, taker_bp_max: refusal thresholds, NOT your fees. The bot
+        reads your real tier from OKX at startup and refuses to run if it is
+        worse than these. Defaults 8.0 / 10.0 are OKX VIP0/VIP1.
+    spend_fraction: fraction of the available balance a single order may
+        consume, default 0.98. The margin absorbs rounding and fees so an
+        order is not rejected for one satoshi of shortfall.
+    warmup_volume_usd: volume below which the loss cap does not arm, `None`
+        means `inventory_band_usd * 4`. Early PnL is dominated by one unlucky
+        fill, so halting on it would be noise, not signal. This is why a bot
+        that is clearly losing may not halt in its first minutes.
+    max_runtime_s: stop after this many seconds, default 0 meaning no limit.
+    unwind_s: seconds allowed to sell back to flat on exit, default 120.
+    poll_s: pause between passes when idle, default 1.0.
+    busy_pause_s: pause after placing or cancelling, default 0.15. Shorter than
+        `poll_s` because an action means the book is moving and the next
+        decision is worth making sooner.
+    quiet_flow_per_min: dollars per minute below which the tape counts as
+        quiet, default 0 meaning measure it from the symbol's own 24h tape at
+        startup. Absolute flow is meaningless across symbols, so a hand-set
+        value only makes sense once you have watched this one.
+    tag: clOrdId prefix, 1-14 alphanumeric chars. Change it only to tell two
+        deployments apart in your OKX order history.
+
+    Returns
+    -------
+    Config with every field validated and converted to Decimal or float.
+
+    Raises
+    ------
+    TypeError: a setting is the wrong type, e.g. `None` where a number is due.
+    ValueError: a setting is the right type but out of contract, e.g. a clip
+        larger than the inventory band, or a symbol that is not BASE-QUOTE.
+    """
     if not isinstance(symbol, str) or symbol.count("-") != 1 or not all(symbol.split("-")):
         raise ValueError(f"SYMBOL must be BASE-QUOTE, e.g. 'RE-USDC', got {symbol!r}")
     if not isinstance(host, str) or not host.startswith("https://"):
@@ -238,13 +302,14 @@ def _config(host: str, symbol: str, api_key: str, api_secret: str,
         _number("TARGET_VOLUME_USD", target_volume_usd, Decimal(1)),
         band,
         _number("SPEND_FRACTION", spend_fraction, Decimal("0.5"), Decimal(1)),
-        _number("MAKER_BP_MAX", maker_bp_max, Decimal(0), Decimal(100)),
-        _number("TAKER_BP_MAX", taker_bp_max, Decimal(0), Decimal(100)),
+        _number("REFUSE_IF_MAKER_BP_OVER", maker_bp_max, Decimal(0), Decimal(100)),
+        _number("REFUSE_IF_TAKER_BP_OVER", taker_bp_max, Decimal(0), Decimal(100)),
         _number("LOSS_CAP_MULT", loss_cap_mult, Decimal("0.1"), Decimal(5)),
         band * 4 if warmup_volume_usd is None else _number("WARMUP_VOLUME_USD", warmup_volume_usd, Decimal(0)),
         float(_number("MAX_RUNTIME_SECONDS", max_runtime_s, Decimal(0))),
         float(_number("UNWIND_SECONDS", unwind_s, Decimal(10))),
         float(_number("POLL_SECONDS", poll_s, Decimal("0.2"), Decimal(60))),
+        float(_number("BUSY_PAUSE_SECONDS", busy_pause_s, Decimal("0.01"), Decimal(10))),
         clip_quiet,
         _number("QUIET_FLOW_USD_PER_MIN", quiet_flow_per_min, Decimal(0)))
 
@@ -474,6 +539,46 @@ def _final_report(pnl: Tally, marked: bool, total_base: Decimal | None) -> str:
             f"   (${per10k:.2f}/$10k){note}\n"
             f"         fees ${pnl.fees:,.4f}   fills {pnl.n_fills} ({pnl.n_maker} maker)"
             f"   base left {held}")
+
+
+def _preflight(cfg: Config) -> str:
+    """Restate the settings as the numbers that decide whether to run at all.
+
+    A settings block shows what was typed; this shows what it costs. The figure
+    that matters is dollars per $10k of volume, because that is the only thing
+    comparable to what a campaign pays - and it appears nowhere in the settings.
+    Printed before the confirmation prompt and before any network call, so it
+    costs nothing and is the last thing seen before real orders.
+
+    Parameters
+    ----------
+    cfg: validated Config, straight out of `_config`.
+
+    Returns
+    -------
+    Multi-line string ending without a trailing newline.
+    """
+    fee10k = cfg.maker_bp_max                       # bp and $/$10k are the same number
+    halt10k = cfg.taker_bp_max * cfg.loss_cap_mult
+    scale = cfg.target_volume_usd / 10000
+    rows = (
+        ("target volume", f"${cfg.target_volume_usd:,.0f}",
+         "buys and sells both count"),
+        ("quote size", f"${cfg.clip_usd:,.0f} / ${cfg.clip_usd_quiet:,.0f}",
+         "busy / quiet, threshold self-measured"),
+        ("inventory cap", f"${cfg.inventory_band_usd:,.0f}",
+         "hard ceiling on coin held"),
+        ("expected fees", f"up to ${fee10k * scale:,.2f}",
+         f"at most {cfg.maker_bp_max} bp maker = ${fee10k:.2f} per $10k"),
+        ("halt line", f"from ${halt10k * scale:,.2f}",
+         f"{cfg.taker_bp_max} bp x {cfg.loss_cap_mult:.2f} = ${halt10k:.2f} per $10k"),
+        ("cap arms after", f"${cfg.warmup_volume_usd:,.0f}",
+         "of volume (4x the inventory cap)"),
+    )
+    body = "\n".join(f"  {label:<16}{value:<14}{note}" for label, value, note in rows)
+    return (f"\nLIVE on {cfg.symbol} at {cfg.host}\n\n{body}\n\n"
+            f"  This bot pays fees to print volume. It is only worth running if\n"
+            f"  something pays you more than ${halt10k:.2f} per $10k.\n")
 
 
 # ------------------------------------------------------------------ IO shell
@@ -836,8 +941,14 @@ def run(cfg: Config) -> None:
     inst = _instrument(cfg)
     fees = _live_fees(cfg)
     if fees.maker_bp > cfg.maker_bp_max or fees.taker_bp > cfg.taker_bp_max:
-        raise ValueError(f"account fees are maker {fees.maker_bp}bp / taker {fees.taker_bp}bp, worse "
-                         f"than the configured {cfg.maker_bp_max}/{cfg.taker_bp_max}; raise them or stop")
+        # name the settings, not just their values: this is the message a user
+        # on the wrong fee tier actually hits, and "raise them" is useless if
+        # you do not know which two lines to edit
+        raise ValueError(
+            f"your real OKX fees are maker {fees.maker_bp}bp / taker {fees.taker_bp}bp, worse than "
+            f"REFUSE_IF_MAKER_BP_OVER {cfg.maker_bp_max} / REFUSE_IF_TAKER_BP_OVER "
+            f"{cfg.taker_bp_max} in the settings block. Raise them only if your reward still pays "
+            f"more than {fees.taker_bp * cfg.loss_cap_mult:.2f} per $10k of volume")
     _quietly(_cancel_symbol, cfg)  # clean slate on this asset: any resting regular order goes
     baseline_base = _balances(cfg).owned
     if baseline_base >= inst.min_sz:
@@ -944,7 +1055,7 @@ def run(cfg: Config) -> None:
             # one action per pass, but only pause when there is nothing to do:
             # after placing or cancelling, the other side usually needs work too,
             # and sleeping a full poll there leaves the book half-quoted.
-            time.sleep(cfg.poll_s if action.kind == "wait" else BUSY_PAUSE_SECONDS)
+            time.sleep(cfg.poll_s if action.kind == "wait" else cfg.busy_pause_s)
     except KeyboardInterrupt:
         last = "interrupted"
     finally:
@@ -983,6 +1094,47 @@ def _selfcheck() -> None:
                  "feeCcy": "RE", "execType": "M", "tradeId": "1"}], Decimal(1), "RE")
     assert t.net == Decimal("-0.008") and t.fees == Decimal("0.008")  # -0.016 = base fee double-counted
 
+    # Every rejection _config can raise gets a test here, because these run on
+    # every start: a setting that is wrong must fail now, named, and not after
+    # the first order is on the book.
+    ok = dict(host="https://eea.okx.com", symbol="RE-USDC", api_key="k",
+              api_secret="s", api_passphrase="p", clip_usd=20,
+              target_volume_usd=5000, inventory_band_usd=100, loss_cap_mult=1.2)
+
+    def _rejects(exc: type, **override) -> None:
+        try:
+            _config(**{**ok, **override})
+        except exc:
+            return
+        raise AssertionError(f"_config accepted {override}, expected {exc.__name__}")
+
+    _rejects(ValueError, clip_usd=500)          # one fill would breach the band
+    _rejects(ValueError, symbol="REUSDC")       # not BASE-QUOTE
+    _rejects(ValueError, symbol="RE-")          # empty quote currency
+    _rejects(ValueError, host="eea.okx.com")    # not https
+    _rejects(ValueError, clip_usd=-1)           # right type, out of contract
+    _rejects(TypeError, clip_usd=None)          # wrong type entirely
+    _rejects(ValueError, clip_usd_quiet=50, busy_pause_s=0)   # below the 0.01s floor
+    cfg = _config(**ok, clip_usd_quiet="10")    # numeric strings are accepted
+    assert cfg.clip_usd_quiet == Decimal(10) and cfg.busy_pause_s == 0.15
+
+    # The loss cap is deliberately inert below warmup (4x the band by default),
+    # so a bot bleeding in its first minutes will not halt. That surprises
+    # people; this pins the behaviour rather than letting it drift.
+    big_loss = Tally(volume=Decimal(100), n_fills=1, n_maker=1,
+                     inv_from_fills=Decimal(0), fees=Decimal(0),
+                     gross=Decimal(0), net=Decimal(-999))
+    assert cfg.warmup_volume_usd == Decimal(400)
+    assert _halt_reason(big_loss, Decimal(1), 0.0, cfg) == ""
+    assert _halt_reason(big_loss._replace(volume=Decimal(500)), Decimal(1), 0.0, cfg) == "loss cap"
+
+    # the preflight is the last thing a user reads before going live, so its
+    # arithmetic is pinned: 8bp maker = $8/$10k, 10bp x 1.20 = $12/$10k
+    pre = _preflight(cfg)
+    assert "$8.00 per $10k" in pre and "$12.00 per $10k" in pre
+    assert "up to $4.00" in pre and "from $6.00" in pre     # scaled to $5,000
+    assert "$400" in pre and cfg.symbol in pre
+
 
 # =============================================================================
 #  1. YOUR SETTINGS - the only things you MUST fill in
@@ -999,16 +1151,38 @@ TARGET_VOLUME_USD = 5000         # stop after this much volume (buys + sells cou
 #  2. TUNING - safe defaults; change only if you know why
 # =============================================================================
 
-HOST = "https://eea.okx.com"     # OKX Europe; global accounts use https://www.okx.com
-CLIP_USD = 20                    # quote size when the market is busy
-CLIP_USD_QUIET = 10              # quote size when it is quiet
-INVENTORY_BAND_USD = 100         # hard ceiling on how much base coin the bot may hold
-BUSY_PAUSE_SECONDS = 0.15        # pause after an action (vs POLL when idle)
-LOSS_CAP_MULT = 1.20             # halts at TAKER fee x this per $10k of volume;
-                                 # set it just under what your reward pays per $10k
-MAKER_BP_MAX = 8.0               # refuse to start if your real maker fee is worse
-TAKER_BP_MAX = 10.0              # than this. Read yours at OKX > Fees, or let the
-                                 # bot tell you: it prints both at startup.
+HOST = "https://eea.okx.com"     # OKX Europe. A global account lives on
+                                 # https://www.okx.com - a SEPARATE account
+                                 # namespace, where these keys will not work.
+
+CLIP_USD = 20                    # size of one quote. Fund ~2x this in the quote
+CLIP_USD_QUIET = 10              # currency to hold both sides at once. The quiet
+                                 # size is used when the tape thins out; the
+                                 # threshold measures itself from the symbol.
+
+INVENTORY_BAND_USD = 100         # hard ceiling on coin held. Buying tapers to
+                                 # zero as inventory approaches it, so this is
+                                 # what caps your directional risk, not CLIP_USD.
+                                 # CLIP_USD may not exceed it.
+
+LOSS_CAP_MULT = 1.20             # sets the halt line, in dollars per $10k of
+                                 # volume:  REFUSE_IF_TAKER_BP_OVER x this.
+                                 # At 10.0 x 1.20 the bot stops near $12 per
+                                 # $10k. Set it just UNDER what your reward pays
+                                 # per $10k, or you are paying to lose money.
+                                 # The cap only arms after 4x INVENTORY_BAND_USD
+                                 # of volume - early PnL is one lucky fill, not
+                                 # signal, so a fresh bot will not halt at once.
+
+REFUSE_IF_MAKER_BP_OVER = 8.0    # These are NOT your fees. The bot reads your
+REFUSE_IF_TAKER_BP_OVER = 10.0   # real tier from OKX at startup and refuses to
+                                 # run if it is worse than these. Defaults are
+                                 # OKX VIP0/VIP1. Raising them does not make
+                                 # trading cheaper - it only removes the alarm.
+
+BUSY_PAUSE_SECONDS = 0.15        # pause after placing or cancelling. Shorter
+                                 # than the idle wait because an action means
+                                 # the book is moving.
 
 if __name__ == "__main__":
     _selfcheck()
@@ -1017,13 +1191,11 @@ if __name__ == "__main__":
                       api_passphrase=API_PASSPHRASE,
                       clip_usd=CLIP_USD, target_volume_usd=TARGET_VOLUME_USD,
                       inventory_band_usd=INVENTORY_BAND_USD, loss_cap_mult=LOSS_CAP_MULT,
-                      clip_usd_quiet=CLIP_USD_QUIET,
-                      maker_bp_max=MAKER_BP_MAX, taker_bp_max=TAKER_BP_MAX)
+                      clip_usd_quiet=CLIP_USD_QUIET, busy_pause_s=BUSY_PAUSE_SECONDS,
+                      maker_bp_max=REFUSE_IF_MAKER_BP_OVER,
+                      taker_bp_max=REFUSE_IF_TAKER_BP_OVER)
         if sys.stdin.isatty() and os.environ.get("OKX_FARM_YES", "").strip() != "1":
-            fee_est = cfg.target_volume_usd * cfg.maker_bp_max / 10000
-            cap_est = cfg.target_volume_usd * cfg.taker_bp_max / 10000 * cfg.loss_cap_mult
-            print(f"LIVE on {cfg.symbol} ({cfg.host}) toward ${cfg.target_volume_usd:,.0f} volume;"
-                  f" expected fees up to ~${fee_est:,.0f}, hard halt near ${cap_est:,.0f}.")
+            print(_preflight(cfg))
             try:
                 ok = input("Type YES to start: ").strip()
             except (EOFError, KeyboardInterrupt):
