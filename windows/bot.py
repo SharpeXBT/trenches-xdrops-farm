@@ -396,7 +396,7 @@ def _wrap(text: str, width: int) -> list[str]:
 
 
 CREDIT_X = "@thatismyquant"       # the bot's author, on X
-CREDIT_TG = "TRENCHES"            # the Telegram group it was shared in
+CREDIT_TG = "t.me/thatsmyquantpublic"   # the Telegram group it was shared in
 
 
 def _panel(cfg: Config, pnl: Tally, mkt: Decimal | None, st: State, inst: Instrument,
@@ -449,7 +449,7 @@ def _panel(cfg: Config, pnl: Tally, mkt: Decimal | None, st: State, inst: Instru
     lines = [
         f"{DIM}{TL}{H * (W - 2)}{TR}{R}",
         row(f"{BOLD}{CYN}{CREDIT_X}{R}{DIM} on X{R}   {DIM}{V}{R}   "
-            f"{BOLD}{CREDIT_TG}{R}{DIM} on Telegram{R}"),
+            f"{BOLD}{CREDIT_TG}{R}"),
         f"{DIM}{ML}{H * (W - 2)}{MR}{R}",
         row(f"{title}   {DIM}{now:%H:%M:%S} | up {clock}{R}"),
         row(f"{state}{DIM} | quoting {R}{quotes}"),
