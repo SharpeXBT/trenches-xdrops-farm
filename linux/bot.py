@@ -395,6 +395,10 @@ def _wrap(text: str, width: int) -> list[str]:
     return out
 
 
+CREDIT_X = "@thatismyquant"       # the bot's author, on X
+CREDIT_TG = "TRENCHES"            # the Telegram group it was shared in
+
+
 def _panel(cfg: Config, pnl: Tally, mkt: Decimal | None, st: State, inst: Instrument,
            budget: Decimal, mode: str, last: str, elapsed: float,
            now: datetime, fancy: bool = False) -> str:
@@ -416,10 +420,12 @@ def _panel(cfg: Config, pnl: Tally, mkt: Decimal | None, st: State, inst: Instru
         DIM, BOLD, CYN, GRN, YEL, RED, R = ("\x1b[90m", "\x1b[1m", "\x1b[96m",
                                             "\x1b[92m", "\x1b[93m", "\x1b[91m", "\x1b[0m")
         TL, TR, BL, BR, H, V = "╭", "╮", "╰", "╯", "─", "│"
+        ML, MR = "├", "┤"
         FULL, EMPTY = "█", "░"
     else:
         DIM = BOLD = CYN = GRN = YEL = RED = R = ""
         TL, TR, BL, BR, H, V = "+", "+", "+", "+", "-", "|"
+        ML, MR = "+", "+"
         FULL, EMPTY = "#", "."
 
     hot = float(per10k) / float(halt10k) if halt10k else 0.0
@@ -442,6 +448,9 @@ def _panel(cfg: Config, pnl: Tally, mkt: Decimal | None, st: State, inst: Instru
     state = f"{GRN if 'running' in mode.lower() else YEL}{mode.upper()}{R}"
     lines = [
         f"{DIM}{TL}{H * (W - 2)}{TR}{R}",
+        row(f"{BOLD}{CYN}{CREDIT_X}{R}{DIM} on X{R}   {DIM}{V}{R}   "
+            f"{BOLD}{CREDIT_TG}{R}{DIM} on Telegram{R}"),
+        f"{DIM}{ML}{H * (W - 2)}{MR}{R}",
         row(f"{title}   {DIM}{now:%H:%M:%S} | up {clock}{R}"),
         row(f"{state}{DIM} | quoting {R}{quotes}"),
         row(""),
@@ -491,7 +500,7 @@ def _vt() -> bool:
 
 def _can_utf8() -> bool:
     try:
-        "╭│█░".encode(getattr(sys.stdout, "encoding", "") or "ascii")
+        "╭│├█░".encode(getattr(sys.stdout, "encoding", "") or "ascii")
         return True
     except (UnicodeEncodeError, LookupError):
         return False
@@ -997,6 +1006,9 @@ INVENTORY_BAND_USD = 100         # hard ceiling on how much base coin the bot ma
 BUSY_PAUSE_SECONDS = 0.15        # pause after an action (vs POLL when idle)
 LOSS_CAP_MULT = 1.20             # halts at TAKER fee x this per $10k of volume;
                                  # set it just under what your reward pays per $10k
+MAKER_BP_MAX = 8.0               # refuse to start if your real maker fee is worse
+TAKER_BP_MAX = 10.0              # than this. Read yours at OKX > Fees, or let the
+                                 # bot tell you: it prints both at startup.
 
 if __name__ == "__main__":
     _selfcheck()
@@ -1005,7 +1017,8 @@ if __name__ == "__main__":
                       api_passphrase=API_PASSPHRASE,
                       clip_usd=CLIP_USD, target_volume_usd=TARGET_VOLUME_USD,
                       inventory_band_usd=INVENTORY_BAND_USD, loss_cap_mult=LOSS_CAP_MULT,
-                      clip_usd_quiet=CLIP_USD_QUIET)
+                      clip_usd_quiet=CLIP_USD_QUIET,
+                      maker_bp_max=MAKER_BP_MAX, taker_bp_max=TAKER_BP_MAX)
         if sys.stdin.isatty() and os.environ.get("OKX_FARM_YES", "").strip() != "1":
             fee_est = cfg.target_volume_usd * cfg.maker_bp_max / 10000
             cap_est = cfg.target_volume_usd * cfg.taker_bp_max / 10000 * cfg.loss_cap_mult
