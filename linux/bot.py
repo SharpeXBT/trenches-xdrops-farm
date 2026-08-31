@@ -1101,20 +1101,28 @@ def _selfcheck() -> None:
               api_secret="s", api_passphrase="p", clip_usd=20,
               target_volume_usd=5000, inventory_band_usd=100, loss_cap_mult=1.2)
 
-    def _rejects(exc: type, **override) -> None:
+    def _rejects(exc: type, says: str, **override) -> None:
+        # `says` is not decoration: a test that only checks "something raised"
+        # passes for the wrong reason as soon as an earlier check starts firing
+        # first, and then silently stops covering what it was written for.
         try:
             _config(**{**ok, **override})
-        except exc:
+        except exc as e:
+            assert says in str(e), f"{override} raised {e!r}, expected it to mention {says!r}"
             return
         raise AssertionError(f"_config accepted {override}, expected {exc.__name__}")
 
-    _rejects(ValueError, clip_usd=500)          # one fill would breach the band
-    _rejects(ValueError, symbol="REUSDC")       # not BASE-QUOTE
-    _rejects(ValueError, symbol="RE-")          # empty quote currency
-    _rejects(ValueError, host="eea.okx.com")    # not https
-    _rejects(ValueError, clip_usd=-1)           # right type, out of contract
-    _rejects(TypeError, clip_usd=None)          # wrong type entirely
-    _rejects(ValueError, clip_usd_quiet=50, busy_pause_s=0)   # below the 0.01s floor
+    _rejects(ValueError, "exceeds INVENTORY_BAND_USD", clip_usd=500)
+    _rejects(ValueError, "SYMBOL must be BASE-QUOTE", symbol="REUSDC")
+    _rejects(ValueError, "SYMBOL must be BASE-QUOTE", symbol="RE-")
+    _rejects(ValueError, "HOST must be an https URL", host="eea.okx.com")
+    _rejects(ValueError, "CLIP_USD must be at least 1", clip_usd=-1)
+    _rejects(TypeError, "CLIP_USD must be a number", clip_usd=None)
+    _rejects(ValueError, "CLIP_USD_QUIET must be between", clip_usd_quiet=50)
+    _rejects(ValueError, "BUSY_PAUSE_SECONDS must be between", busy_pause_s=0)
+    _rejects(TypeError, "BUSY_PAUSE_SECONDS must be a number", busy_pause_s=None)
+    _rejects(ValueError, "REFUSE_IF_MAKER_BP_OVER must be between", maker_bp_max=200)
+    _rejects(ValueError, "REFUSE_IF_TAKER_BP_OVER must be between", taker_bp_max=-1)
     cfg = _config(**ok, clip_usd_quiet="10")    # numeric strings are accepted
     assert cfg.clip_usd_quiet == Decimal(10) and cfg.busy_pause_s == 0.15
 
