@@ -55,7 +55,7 @@ Then set, in the same place:
 
 | Knob | Meaning |
 |---|---|
-| `SYMBOL` | spot pair, BASE-QUOTE, e.g. `RE-USDC` |
+| `SYMBOL` | spot pair, BASE-QUOTE, e.g. `GRVT-USDC`. Check which pair the campaign actually counts - on RE only the USDC pair earned, USDT volume counted for nothing |
 | `HOST` | `eea.okx.com` (European account) or `www.okx.com` (global) - separate namespaces, a key from one does not work on the other |
 | `TARGET_VOLUME_USD` | stop after this much volume (buy + sell legs both count) |
 | `CLIP_USD` | size of one quote; fund ~2x this in the quote currency to hold both sides |

@@ -72,7 +72,7 @@ Tout en bas de `bot.py`, deux zones :
 | Variable | Rôle |
 |---|---|
 | `API_KEY` / `API_SECRET` / `API_PASSPHRASE` | vos clés |
-| `SYMBOL` | la paire spot à farmer, ex. `RE-USDC` |
+| `SYMBOL` | la paire spot à farmer, ex. `GRVT-USDC`. Vérifiez quelle paire la campagne compte vraiment — sur RE seule la paire USDC rapportait, le volume USDT ne comptait pas |
 | `TARGET_VOLUME_USD` | le bot s'arrête après ce volume (achats + ventes) |
 
 **Zone 2 — réglages avancés** (les valeurs par défaut sont saines) :

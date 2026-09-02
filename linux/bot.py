@@ -192,8 +192,10 @@ def _quote_prices(ext_bid: Decimal, ext_ask: Decimal, tick: Decimal) -> tuple[De
         # No room inside, so JOIN both touches rather than stand aside. A
         # post-only at the best bid does not cross - it queues behind what is
         # already there. Standing aside here costs the whole busy regime: the
-        # book is tightest exactly when the tape is heaviest, and RE-USDC sits
-        # under 3 ticks ~40% of the time.
+        # book is tightest exactly when the tape is heaviest, and on RE-USDC,
+        # where this was measured, the spread sat under 3 ticks ~40% of the
+        # time. Expect the same on any pair whose tick is a large share of its
+        # spread.
         return ext_bid, ext_ask
     bid = ext_bid + tick
     ask = bid + tick
@@ -233,7 +235,7 @@ def _config(host: str, symbol: str, api_key: str, api_secret: str,
     host: OKX base URL. `https://eea.okx.com` for a European account,
         `https://www.okx.com` for a global one. They are separate account
         namespaces - keys from one do not work on the other.
-    symbol: spot pair as BASE-QUOTE, e.g. `RE-USDC`.
+    symbol: spot pair as BASE-QUOTE, e.g. `GRVT-USDC`.
     api_key, api_secret, api_passphrase: OKX credentials with the Trade
         permission and NOT withdrawal. Empty strings fall back to the
         `OKX_API_KEY` / `OKX_API_SECRET` / `OKX_API_PASSPHRASE` environment
@@ -284,7 +286,7 @@ def _config(host: str, symbol: str, api_key: str, api_secret: str,
         larger than the inventory band, or a symbol that is not BASE-QUOTE.
     """
     if not isinstance(symbol, str) or symbol.count("-") != 1 or not all(symbol.split("-")):
-        raise ValueError(f"SYMBOL must be BASE-QUOTE, e.g. 'RE-USDC', got {symbol!r}")
+        raise ValueError(f"SYMBOL must be BASE-QUOTE, e.g. 'GRVT-USDC', got {symbol!r}")
     if not isinstance(host, str) or not host.startswith("https://"):
         raise ValueError(f"HOST must be an https URL, got {host!r}")
     if not isinstance(tag, str) or not (tag.isascii() and tag.isalnum()) or len(tag) > 14:
@@ -1091,13 +1093,13 @@ def _selfcheck() -> None:
     assert _floor_lot(Decimal("7.9"), Decimal(1)) == Decimal(7)
     assert _external_book([(Decimal(1), Decimal(5))], {Decimal(1): Decimal(5)}) == []
     t = _tally([{"fillPx": "1", "fillSz": "10", "side": "buy", "fee": "-0.008",
-                 "feeCcy": "RE", "execType": "M", "tradeId": "1"}], Decimal(1), "RE")
+                 "feeCcy": "GRVT", "execType": "M", "tradeId": "1"}], Decimal(1), "GRVT")
     assert t.net == Decimal("-0.008") and t.fees == Decimal("0.008")  # -0.016 = base fee double-counted
 
     # Every rejection _config can raise gets a test here, because these run on
     # every start: a setting that is wrong must fail now, named, and not after
     # the first order is on the book.
-    ok = dict(host="https://eea.okx.com", symbol="RE-USDC", api_key="k",
+    ok = dict(host="https://eea.okx.com", symbol="GRVT-USDC", api_key="k",
               api_secret="s", api_passphrase="p", clip_usd=20,
               target_volume_usd=5000, inventory_band_usd=100, loss_cap_mult=1.2)
 
@@ -1113,8 +1115,8 @@ def _selfcheck() -> None:
         raise AssertionError(f"_config accepted {override}, expected {exc.__name__}")
 
     _rejects(ValueError, "exceeds INVENTORY_BAND_USD", clip_usd=500)
-    _rejects(ValueError, "SYMBOL must be BASE-QUOTE", symbol="REUSDC")
-    _rejects(ValueError, "SYMBOL must be BASE-QUOTE", symbol="RE-")
+    _rejects(ValueError, "SYMBOL must be BASE-QUOTE", symbol="GRVTUSDC")
+    _rejects(ValueError, "SYMBOL must be BASE-QUOTE", symbol="GRVT-")
     _rejects(ValueError, "HOST must be an https URL", host="eea.okx.com")
     _rejects(ValueError, "CLIP_USD must be at least 1", clip_usd=-1)
     _rejects(TypeError, "CLIP_USD must be a number", clip_usd=None)
@@ -1152,7 +1154,7 @@ API_KEY = ""                     # OKX API key   (trade permission, NO withdrawa
 API_SECRET = ""                  # OKX API secret
 API_PASSPHRASE = ""              # OKX API passphrase
 
-SYMBOL = "RE-USDC"               # the spot pair to farm, BASE-QUOTE
+SYMBOL = "GRVT-USDC"             # the spot pair to farm, BASE-QUOTE
 TARGET_VOLUME_USD = 5000         # stop after this much volume (buys + sells count)
 
 # =============================================================================
