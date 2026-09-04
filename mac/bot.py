@@ -235,7 +235,7 @@ def _config(host: str, symbol: str, api_key: str, api_secret: str,
     host: OKX base URL. `https://eea.okx.com` for a European account,
         `https://www.okx.com` for a global one. They are separate account
         namespaces - keys from one do not work on the other.
-    symbol: spot pair as BASE-QUOTE, e.g. `GRVT-USDC`.
+    symbol: spot pair as BASE-QUOTE, e.g. `CP-USDC`.
     api_key, api_secret, api_passphrase: OKX credentials with the Trade
         permission and NOT withdrawal. Empty strings fall back to the
         `OKX_API_KEY` / `OKX_API_SECRET` / `OKX_API_PASSPHRASE` environment
@@ -286,7 +286,7 @@ def _config(host: str, symbol: str, api_key: str, api_secret: str,
         larger than the inventory band, or a symbol that is not BASE-QUOTE.
     """
     if not isinstance(symbol, str) or symbol.count("-") != 1 or not all(symbol.split("-")):
-        raise ValueError(f"SYMBOL must be BASE-QUOTE, e.g. 'GRVT-USDC', got {symbol!r}")
+        raise ValueError(f"SYMBOL must be BASE-QUOTE, e.g. 'CP-USDC', got {symbol!r}")
     if not isinstance(host, str) or not host.startswith("https://"):
         raise ValueError(f"HOST must be an https URL, got {host!r}")
     if not isinstance(tag, str) or not (tag.isascii() and tag.isalnum()) or len(tag) > 14:
@@ -563,24 +563,41 @@ def _preflight(cfg: Config) -> str:
     fee10k = cfg.maker_bp_max                       # bp and $/$10k are the same number
     halt10k = cfg.taker_bp_max * cfg.loss_cap_mult
     scale = cfg.target_volume_usd / 10000
-    rows = (
-        ("target volume", f"${cfg.target_volume_usd:,.0f}",
-         "buys and sells both count"),
-        ("quote size", f"${cfg.clip_usd:,.0f} / ${cfg.clip_usd_quiet:,.0f}",
-         "busy / quiet, threshold self-measured"),
-        ("inventory cap", f"${cfg.inventory_band_usd:,.0f}",
-         "hard ceiling on coin held"),
-        ("expected fees", f"up to ${fee10k * scale:,.2f}",
-         f"at most {cfg.maker_bp_max} bp maker = ${fee10k:.2f} per $10k"),
-        ("halt line", f"from ${halt10k * scale:,.2f}",
-         f"{cfg.taker_bp_max} bp x {cfg.loss_cap_mult:.2f} = ${halt10k:.2f} per $10k"),
-        ("cap arms after", f"${cfg.warmup_volume_usd:,.0f}",
-         "of volume (4x the inventory cap)"),
+    # "volume" on this exchange counts each leg, so the target buys about half
+    # of it and sells the other half - the single thing people misread.
+    each_way = cfg.target_volume_usd / 2
+    funding = cfg.clip_usd * 2 + cfg.inventory_band_usd
+    hours = "" if not cfg.max_runtime_s else \
+        f", or after {cfg.max_runtime_s / 3600:.1f}h, whichever comes first"
+
+    stops = (
+        (f"${cfg.target_volume_usd:,.0f} of volume",
+         f"~${each_way:,.0f} bought and ~${each_way:,.0f} sold{hours}"),
+        (f"${halt10k * scale:,.2f} of loss",
+         f"the halt line: ${halt10k:.2f} per $10k, armed only past "
+         f"${cfg.warmup_volume_usd:,.0f} of volume"),
+        ("Ctrl+C, once",
+         "it then cancels and sells back to flat"),
     )
-    body = "\n".join(f"  {label:<16}{value:<14}{note}" for label, value, note in rows)
-    return (f"\nLIVE on {cfg.symbol} at {cfg.host}\n\n{body}\n\n"
-            f"  This bot pays fees to print volume. It is only worth running if\n"
-            f"  something pays you more than ${halt10k:.2f} per $10k.\n")
+    does = (
+        ("quotes", f"${cfg.clip_usd:,.0f} bid + ${cfg.clip_usd:,.0f} ask at the touch, "
+                   f"post-only (never takes)"),
+        ("holds at most", f"${cfg.inventory_band_usd:,.0f} of {cfg.base_ccy}"),
+        ("needs funded", f"~${funding:,.0f} of {cfg.quote_ccy} to run comfortably"),
+    )
+    a = "\n".join(f"  {k:<16}{v}" for k, v in does)
+    b = "\n".join(f"  {k:<24}{v}" for k, v in stops)
+    return (f"\nLIVE on {cfg.symbol} at {cfg.host}\n"
+            f"\nWHAT IT DOES\n{a}\n"
+            f"\nIT STOPS AT (whichever comes first)\n{b}\n"
+            f"\nWHAT IT COSTS\n"
+            f"  fees              up to ${fee10k * scale:,.2f}   "
+            f"({cfg.maker_bp_max} bp maker = ${fee10k:.2f} per $10k traded)\n"
+            f"  worst case        ${halt10k * scale:,.2f}   "
+            f"(it halts there rather than keep losing)\n"
+            f"\n  This bot PAYS to print volume - it is not a strategy that earns.\n"
+            f"  Only run it if a campaign or rebate pays you more than "
+            f"${halt10k:.2f} per $10k.\n")
 
 
 # ------------------------------------------------------------------ IO shell
@@ -1093,13 +1110,13 @@ def _selfcheck() -> None:
     assert _floor_lot(Decimal("7.9"), Decimal(1)) == Decimal(7)
     assert _external_book([(Decimal(1), Decimal(5))], {Decimal(1): Decimal(5)}) == []
     t = _tally([{"fillPx": "1", "fillSz": "10", "side": "buy", "fee": "-0.008",
-                 "feeCcy": "GRVT", "execType": "M", "tradeId": "1"}], Decimal(1), "GRVT")
+                 "feeCcy": "CP", "execType": "M", "tradeId": "1"}], Decimal(1), "CP")
     assert t.net == Decimal("-0.008") and t.fees == Decimal("0.008")  # -0.016 = base fee double-counted
 
     # Every rejection _config can raise gets a test here, because these run on
     # every start: a setting that is wrong must fail now, named, and not after
     # the first order is on the book.
-    ok = dict(host="https://eea.okx.com", symbol="GRVT-USDC", api_key="k",
+    ok = dict(host="https://eea.okx.com", symbol="CP-USDC", api_key="k",
               api_secret="s", api_passphrase="p", clip_usd=20,
               target_volume_usd=5000, inventory_band_usd=100, loss_cap_mult=1.2)
 
@@ -1115,8 +1132,8 @@ def _selfcheck() -> None:
         raise AssertionError(f"_config accepted {override}, expected {exc.__name__}")
 
     _rejects(ValueError, "exceeds INVENTORY_BAND_USD", clip_usd=500)
-    _rejects(ValueError, "SYMBOL must be BASE-QUOTE", symbol="GRVTUSDC")
-    _rejects(ValueError, "SYMBOL must be BASE-QUOTE", symbol="GRVT-")
+    _rejects(ValueError, "SYMBOL must be BASE-QUOTE", symbol="CPUSDC")
+    _rejects(ValueError, "SYMBOL must be BASE-QUOTE", symbol="CP-")
     _rejects(ValueError, "HOST must be an https URL", host="eea.okx.com")
     _rejects(ValueError, "CLIP_USD must be at least 1", clip_usd=-1)
     _rejects(TypeError, "CLIP_USD must be a number", clip_usd=None)
@@ -1142,8 +1159,10 @@ def _selfcheck() -> None:
     # arithmetic is pinned: 8bp maker = $8/$10k, 10bp x 1.20 = $12/$10k
     pre = _preflight(cfg)
     assert "$8.00 per $10k" in pre and "$12.00 per $10k" in pre
-    assert "up to $4.00" in pre and "from $6.00" in pre     # scaled to $5,000
+    assert "up to $4.00" in pre and "$6.00" in pre          # scaled to $5,000
     assert "$400" in pre and cfg.symbol in pre
+    assert "$2,500 bought" in pre and "$2,500 sold" in pre  # both legs, spelled out
+    assert "PAYS to print volume" in pre
 
 
 # =============================================================================
@@ -1154,7 +1173,11 @@ API_KEY = ""                     # OKX API key   (trade permission, NO withdrawa
 API_SECRET = ""                  # OKX API secret
 API_PASSPHRASE = ""              # OKX API passphrase
 
-SYMBOL = "GRVT-USDC"             # the spot pair to farm, BASE-QUOTE
+SYMBOL = "CP-USDC"               # the spot pair to farm, BASE-QUOTE.
+                                 # CHECK IT EXISTS AND WHICH PAIR THE CAMPAIGN
+                                 # COUNTS: on RE only the USDC pair earned, and
+                                 # a campaign pair is often listed hours before
+                                 # the campaign opens.
 TARGET_VOLUME_USD = 5000         # stop after this much volume (buys + sells count)
 
 # =============================================================================
