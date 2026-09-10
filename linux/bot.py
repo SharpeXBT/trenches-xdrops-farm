@@ -410,8 +410,13 @@ def _decide(st: State, inst: Instrument, cfg: Config, reduce_only: bool) -> Acti
         if held and held.px != px:
             return Action("cancel", "stale", side=side, price=held.px, ord_id=held.ord_id)
         if want and not held:
-            size = _affordable(side, px, st.avail_base, st.free_quote, inst,
-                               target, cfg.spend_fraction)
+            # An ask may only offer what the bot bought itself. total_base is
+            # already net of the startup baseline; avail_base is the whole
+            # wallet, and capping on it alone sold a user's own coins whenever a
+            # partial buy left the inventory below the clip (measured: 290
+            # USDC over 1.7h on USDC-EUR with a 100 clip and 76-unit buys).
+            size = _affordable(side, px, min(st.avail_base, st.total_base), st.free_quote,
+                               inst, target, cfg.spend_fraction)
             if size > 0:
                 return Action("quote", "room to quote", side=side, price=px, size=size)
             starved = side
@@ -1154,6 +1159,17 @@ def _selfcheck() -> None:
     assert cfg.warmup_volume_usd == Decimal(400)
     assert _halt_reason(big_loss, Decimal(1), 0.0, cfg) == ""
     assert _halt_reason(big_loss._replace(volume=Decimal(500)), Decimal(1), 0.0, cfg) == "loss cap"
+
+    # The ask is capped at the bot's own inventory (total_base, already net of
+    # the baseline), never at the wallet: 1000 coins held, 5 bought by the bot,
+    # clip 20 -> the ask offers 5 x SPEND_FRACTION, not 20.
+    inst = Instrument(tick, Decimal("0.01"), Decimal(1))
+    st = State([], [], [(Decimal("1.0000"), Decimal(100))], [(Decimal("1.0003"), Decimal(100))],
+               Decimal("1.00015"), Decimal(1000), Decimal(5), Decimal(0), {})
+    act = _decide(st, inst, cfg, reduce_only=False)
+    assert act.kind == "quote" and act.side == "sell", act
+    assert act.size == Decimal("4.9"), act.size
+    assert _decide(st._replace(total_base=Decimal(0)), inst, cfg, reduce_only=True).kind == "wait"
 
     # the preflight is the last thing a user reads before going live, so its
     # arithmetic is pinned: 8bp maker = $8/$10k, 10bp x 1.20 = $12/$10k
