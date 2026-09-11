@@ -286,7 +286,7 @@ def _config(host: str, symbol: str, api_key: str, api_secret: str,
         larger than the inventory band, or a symbol that is not BASE-QUOTE.
     """
     if not isinstance(symbol, str) or symbol.count("-") != 1 or not all(symbol.split("-")):
-        raise ValueError(f"SYMBOL must be BASE-QUOTE, e.g. 'CP-USDC', got {symbol!r}")
+        raise ValueError(f"SYMBOL must be BASE-QUOTE, e.g. 'SOL-USDC', got {symbol!r}")
     if not isinstance(host, str) or not host.startswith("https://"):
         raise ValueError(f"HOST must be an https URL, got {host!r}")
     if not isinstance(tag, str) or not (tag.isascii() and tag.isalnum()) or len(tag) > 14:
@@ -1189,11 +1189,16 @@ API_KEY = ""                     # OKX API key   (trade permission, NO withdrawa
 API_SECRET = ""                  # OKX API secret
 API_PASSPHRASE = ""              # OKX API passphrase
 
-SYMBOL = "CP-USDC"               # the spot pair to farm, BASE-QUOTE.
-                                 # CHECK IT EXISTS AND WHICH PAIR THE CAMPAIGN
-                                 # COUNTS: on RE only the USDC pair earned, and
-                                 # a campaign pair is often listed hours before
-                                 # the campaign opens.
+SYMBOL = "SOL-USDC"              # the spot pair to farm, BASE-QUOTE. Default set
+                                 # for the HYPE X Drops (11-17 Sep 2026). Ten
+                                 # eligible assets: UNI SOL HYPE ZEC SUI ENA TAO
+                                 # ARB ONDO NEAR. SOL-USDC is the cheapest volume
+                                 # (2bp spread, deep book); HYPE-USDC and ZEC-USDC
+                                 # are the next best. USDC pairs are confirmed
+                                 # live; whether EUR pairs also count is
+                                 # UNCONFIRMED - RE counted USDC only. You MUST
+                                 # click JOIN in the app first, or volume earns
+                                 # nothing.
 TARGET_VOLUME_USD = 5000         # stop after this much volume (buys + sells count)
 
 # =============================================================================
@@ -1217,8 +1222,14 @@ INVENTORY_BAND_USD = 100         # hard ceiling on coin held. Buying tapers to
 LOSS_CAP_MULT = 1.20             # sets the halt line, in dollars per $10k of
                                  # volume:  REFUSE_IF_TAKER_BP_OVER x this.
                                  # At 10.0 x 1.20 the bot stops near $12 per
-                                 # $10k. Set it just UNDER what your reward pays
-                                 # per $10k, or you are paying to lose money.
+                                 # $10k. If the reward pays a fixed rate per $10k,
+                                 # set this just UNDER it. If the reward is a
+                                 # CAPPED volume-share (e.g. HYPE X Drops, max 2
+                                 # HYPE ~EUR136), there is no per-$10k rate: this
+                                 # halt only catches adverse blowouts above the
+                                 # ~$7-9 fee floor, and TARGET_VOLUME_USD caps your
+                                 # total spend - size it to break-even (cap EUR /
+                                 # your $/$10k cost; ~$170k at EUR136 and $8).
                                  # The cap only arms after 4x INVENTORY_BAND_USD
                                  # of volume - early PnL is one lucky fill, not
                                  # signal, so a fresh bot will not halt at once.
