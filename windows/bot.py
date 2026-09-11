@@ -285,6 +285,8 @@ def _config(host: str, symbol: str, api_key: str, api_secret: str,
     ValueError: a setting is the right type but out of contract, e.g. a clip
         larger than the inventory band, or a symbol that is not BASE-QUOTE.
     """
+    if isinstance(symbol, str):
+        symbol = symbol.strip().upper()   # OKX instIds are upper-case; accept 'sol-usdc'
     if not isinstance(symbol, str) or symbol.count("-") != 1 or not all(symbol.split("-")):
         raise ValueError(f"SYMBOL must be BASE-QUOTE, e.g. 'SOL-USDC', got {symbol!r}")
     if not isinstance(host, str) or not host.startswith("https://"):
@@ -1139,6 +1141,8 @@ def _selfcheck() -> None:
     _rejects(ValueError, "exceeds INVENTORY_BAND_USD", clip_usd=500)
     _rejects(ValueError, "SYMBOL must be BASE-QUOTE", symbol="CPUSDC")
     _rejects(ValueError, "SYMBOL must be BASE-QUOTE", symbol="CP-")
+    _c = _config(**{**ok, "symbol": "sol-usdc"})   # lower-case is normalised, not rejected
+    assert (_c.base_ccy, _c.quote_ccy) == ("SOL", "USDC"), f"symbol not upper-cased: {_c.base_ccy}-{_c.quote_ccy}"
     _rejects(ValueError, "HOST must be an https URL", host="eea.okx.com")
     _rejects(ValueError, "CLIP_USD must be at least 1", clip_usd=-1)
     _rejects(TypeError, "CLIP_USD must be a number", clip_usd=None)
